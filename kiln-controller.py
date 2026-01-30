@@ -5,7 +5,7 @@ import os
 import sys
 import logging
 import json
-
+import datetime
 import bottle
 import gevent
 import geventwebsocket
@@ -25,8 +25,8 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
 profile_path = config.kiln_profiles_directory
 
-from oven import SimulatedOven, RealOven, Profile
-from ovenWatcher import OvenWatcher
+from lib.oven import SimulatedOven, RealOven, Profile
+from lib.ovenWatcher import OvenWatcher
 
 app = bottle.Bottle()
 
@@ -50,11 +50,23 @@ def state():
 
 @app.get('/api/stats')
 def handle_api():
+    stats={}
+    st={}
     log.info("/api/stats command received")
+    profiles=json.loads(get_profiles())
+    stats["Profiles"]=[item["name"] for item in profiles if "name" in item]
     if hasattr(oven,'pid'):
-        if hasattr(oven.pid,'pidstats'):
-            return json.dumps(oven.pid.pidstats)
-
+        st["cost"]=oven.cost
+        st["catching_up"]=oven.catching_up
+        st["heat_rate"]=oven.heat_rate
+        st["State"]=oven.state
+        st["runtime"]=oven.runtime
+        if len(oven.pid.pidstats)>0:
+            st["start_time"]=oven.start_time.isoformat()
+            st["pidstats"]=oven.pid.pidstats
+            st["Profile"]=oven.profile.name
+        stats["Stats"]=st
+    return json.dumps(stats)
 
 @app.post('/api')
 def handle_api():
