@@ -56,6 +56,8 @@ class OvenWatcher(threading.Thread):
 
     def run(self):
         # Main loop: each iteration handles exceptions internally to stay alive
+        temppid:Oven
+        
         while True:
             try:
                 oven_state = self.oven.get_state()
