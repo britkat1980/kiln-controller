@@ -2,6 +2,7 @@ import threading,logging,json,time,datetime
 import config
 import paho.mqtt.client as mqtt
 import json
+import time
 
 from oven import Oven
 log = logging.getLogger(__name__)
@@ -37,6 +38,23 @@ class OvenWatcher(threading.Thread):
             self._setup_mqtt()
         self.start()
 
+        self.temppid = {
+            'time': 0,
+            'timeDelta': 0,
+            'setpoint': 0,
+            'ispoint': 0,
+            'err': 0,
+            'errDelta': 0,
+            'p': 0,
+            'i': 0,
+            'd': 0,
+            'kp': 0,
+            'ki': 0,
+            'kd': 0,
+            'pid': 0,
+            'out': 0
+        }
+
 # FIXME - need to save runs of schedules in near-real-time
 # FIXME - this will enable re-start in case of power outage
 # FIXME - re-start also requires safety start (pausing at the beginning
@@ -56,8 +74,6 @@ class OvenWatcher(threading.Thread):
 
     def run(self):
         # Main loop: each iteration handles exceptions internally to stay alive
-        temppid:Oven
-        
         while True:
             try:
                 oven_state = self.oven.get_state()
@@ -79,6 +95,8 @@ class OvenWatcher(threading.Thread):
                     # Iterate oven_state to get individual topics to publish.
                     for topic in oven_state:
                         if topic=="pidstats":
+                            if len(oven_state[topic])==0:
+                                oven_state[topic]=self.temppid
                             for pid_topic in oven_state[topic]:
                                 result = self.client.publish(config.mqtt_kiln_name+"/pidstats/"+pid_topic, oven_state[pid_topic],retain=True)
                                 if result.rc != mqtt.MQTT_ERR_SUCCESS:
