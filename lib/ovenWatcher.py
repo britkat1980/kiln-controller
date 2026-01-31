@@ -98,7 +98,7 @@ class OvenWatcher(threading.Thread):
                             if len(oven_state[topic])==0:
                                 oven_state[topic]=self.temppid
                             for pid_topic in oven_state[topic]:
-                                result = self.client.publish(config.mqtt_kiln_name+"/pidstats/"+pid_topic, oven_state[pid_topic],retain=True)
+                                result = self.client.publish(config.mqtt_kiln_name+"/pidstats/"+pid_topic, oven_state["pidstats"][pid_topic],retain=True)
                                 if result.rc != mqtt.MQTT_ERR_SUCCESS:
                                     log.error(f"Publish failed, code: {result.rc}")
                                     break
