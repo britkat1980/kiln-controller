@@ -73,9 +73,20 @@ class OvenWatcher(threading.Thread):
                 if config.mqtt_enabled:
                     oven_state["name"] = config.mqtt_kiln_name
                     payload = json.dumps(oven_state)
-                    result = self.client.publish(config.mqtt_topic, payload)
-                    if result.rc != mqtt.MQTT_ERR_SUCCESS:
-                        log.error(f"Publish failed, code: {result.rc}")
+
+                    # Iterate oven_state to get individual topics to publish.
+                    for topic in oven_state:
+                        if topic=="pidstats":
+                            for pid_topic in oven_state[topic]:
+                                result = self.client.publish(config.mqtt_topic+"/pidstats/"+pid_topic, oven_state[pid_topic])
+                                if result.rc != mqtt.MQTT_ERR_SUCCESS:
+                                    log.error(f"Publish failed, code: {result.rc}")
+                                    break
+                        else:
+                            result = self.client.publish(config.mqtt_topic+"/"+topic, oven_state[topic])
+                            if result.rc != mqtt.MQTT_ERR_SUCCESS:
+                                log.error(f"Publish failed, code: {result.rc}")
+                                break
 
             except Exception as exc:
                 log.exception(f"Exception in OvenWatcher iteration: {exc}")
