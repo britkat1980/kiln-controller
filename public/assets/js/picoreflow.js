@@ -559,11 +559,11 @@ $(document).ready(function()
                     const now = new Date();
                     const eta_time = (new Date(now.getTime() + (left - now.getTimezoneOffset() * 60) * 1000)).toISOString().substring(11, 19);
                     updateProgress(parseFloat(x.runtime)/parseFloat(x.totaltime)*100);
-                     $('#state').html(
-                        '<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span> ' +
-                        '<span style="font-family: Digi; font-size: 40px;">' + eta + '</span> ' +
-                        '<span class="glyphicon glyphicon-info-sign" style="font-size: 22px; font-weight: normal" ' +
-                        'title="Estimated completion time: '+eta_time+'"></span></span>');
+                    $('#state').html(
+                       '<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span> ' +
+                       '<span style="font-family: Digi; font-size: 40px;">' + eta + '</span> ' +
+                       '<span class="glyphicon glyphicon-info-sign" style="font-size: 22px; font-weight: normal" ' +
+                       'title="Estimated completion time: '+eta_time+'"></span></span>');
                     $('#target_temp').html(parseInt(x.target));
                     $('#cost').html(x.currency_type + parseFloat(x.cost).toFixed(2));
                   
