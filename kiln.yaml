@@ -1,0 +1,271 @@
+template:
+  sensor:
+    - default_entity_id: sensor.kittec_cb40_kiln_kiln_firing_progress
+      name: "Kiln Firing Progress"
+      unit_of_measurement: "%"
+      icon: mdi:progress-helper
+      state: >
+        {% set run = states('sensor.kittec_cb40_kiln_kiln_runtime') | float(0) %}
+        {% set total = states('sensor.kittec_cb40_kiln_kiln_program_duration') | float(0) %}
+        {% if total > 0 %}
+        {{ ((run / total) * 100) | round(0) }}
+        {% else %}
+        0
+        {% endif %}
+mqtt:
+  sensor:
+    # ============================
+    # Top-level fields
+    # ============================
+    - name: "Cost"
+      unique_id: kittec_cb40_cost
+      state_topic: "Kittec_CB40/cost"
+      unit_of_measurement: "£"
+      icon: mdi:currency-gbp
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+        name: "Kittec CB40"
+        manufacturer: "Kittec"
+        model: "CB40"
+
+    - name: "Runtime"
+      unique_id: kittec_cb40_runtime
+      state_topic: "Kittec_CB40/runtime"
+      icon: mdi:timer-outline
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+        name: "Kittec CB40"
+        manufacturer: "Kittec"
+        model: "CB40"
+
+    - name: "Runtime Format"
+      unique_id: kittec_cb40_runtime_format
+      state_topic: "Kittec_CB40/runtime"
+      icon: mdi:timer-outline
+      value_template: >
+        {% set s = value | int(0) | default (0)%}
+        {% set h = s // 3600 %}
+        {% set m = (s % 3600) // 60 %}
+        {% set sec = s % 60 %}
+        {{ "%02d:%02d:%02d" | format(h, m, sec) }}
+      device:
+        identifiers: ["kittec_cb40"]
+        name: "Kittec CB40"
+        manufacturer: "Kittec"
+        model: "CB40"
+
+    - name: "Temperature"
+      unique_id: kittec_cb40_temperature
+      state_topic: "Kittec_CB40/temperature"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      icon: mdi:thermometer
+      value_template: "{{ value  | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "Target Temperature"
+      unique_id: kittec_cb40_target
+      state_topic: "Kittec_CB40/target"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      icon: mdi:thermometer-check
+      value_template: "{{ value  | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "State"
+      unique_id: kittec_cb40_state
+      state_topic: "Kittec_CB40/state"
+      icon: mdi:progress-clock
+      value_template: "{{ value }}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "Element Output"
+      unique_id: kittec_cb40_element_output
+      state_topic: "Kittec_CB40/heat"
+      icon: mdi:fire
+      value_template: "{{ value heat | default (0)}}"
+      unit_of_measurement: "%"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "Heat Rate"
+      unique_id: kittec_cb40_heat_rate
+      state_topic: "Kittec_CB40/heat_rate"
+      unit_of_measurement: "C/hr"
+      icon: mdi:fire-circle
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "Program Duration"
+      unique_id: kittec_cb40_program_duration
+      state_topic: "Kittec_CB40/totaltime"
+      unit_of_measurement: "s"
+      icon: mdi:timeline-clock
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "Program Duration Format"
+      unique_id: kittec_cb40_program_duration_format
+      state_topic: "Kittec_CB40/totaltime"
+      icon: mdi:timer-outline
+      value_template: >
+        {% set s = value | int(0) | default (0)%}
+        {% set h = s // 3600 %}
+        {% set m = (s % 3600) // 60 %}
+        {% set sec = s % 60 %}
+        {{ "%02d:%02d:%02d" | format(h, m, sec) }}
+      device:
+        identifiers: ["kittec_cb40"]
+        name: "Kittec CB40"
+        manufacturer: "Kittec"
+        model: "CB40"
+
+    - name: "Profile"
+      unique_id: kittec_cb40_profile
+      state_topic: "Kittec_CB40/profile"
+      icon: mdi:chart-line
+      value_template: "{{ value | default ('Not Running')}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "Catching Up"
+      unique_id: kittec_cb40_catching_up
+      state_topic: "Kittec_CB40/catching_up"
+      icon: mdi:run-fast
+      value_template: "{{ value | default (False)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+
+    # ============================
+    # PID Stats
+    # ============================
+
+    - name: "PID Time"
+      unique_id: kittec_cb40_pid_time
+      state_topic: "Kittec_CB40/pidstats/time"
+      icon: mdi:clock-outline
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID Time Delta"
+      unique_id: kittec_cb40_pid_timedelta
+      state_topic: "Kittec_CB40/pidstats/timeDelta"
+      icon: mdi:timer-sand
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID Setpoint"
+      unique_id: kittec_cb40_pid_setpoint
+      state_topic: "Kittec_CB40/pidstats/setpoint"
+      unit_of_measurement: "°C"
+      icon: mdi:thermometer-check
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID Input"
+      unique_id: kittec_cb40_pid_input
+      state_topic: "Kittec_CB40/pidstats/ispoint"
+      unit_of_measurement: "°C"
+      icon: mdi:thermometer
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID Error"
+      unique_id: kittec_cb40_pid_error
+      state_topic: "Kittec_CB40/pidstats/err"
+      icon: mdi:alert-circle-outline
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID Error Delta"
+      unique_id: kittec_cb40_pid_errdelta
+      state_topic: "Kittec_CB40/pidstats/errDelta"
+      icon: mdi:delta
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID P Term"
+      unique_id: kittec_cb40_pid_p
+      state_topic: "Kittec_CB40/pidstats/p"
+      icon: mdi:alpha-p-circle-outline
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID I Term"
+      unique_id: kittec_cb40_pid_i
+      state_topic: "Kittec_CB40/pidstats/i"
+      icon: mdi:alpha-i-circle-outline
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID D Term"
+      unique_id: kittec_cb40_pid_d
+      state_topic: "Kittec_CB40/pidstats/d"
+      icon: mdi:alpha-d-circle-outline
+      value_template: "{{ value | float | round(2) | default (0)}}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID KP"
+      unique_id: kittec_cb40_pid_kp
+      state_topic: "Kittec_CB40/pidstats/kp"
+      icon: mdi:alpha-p-box-outline
+      value_template: "{{ value | float | round(2)| default (0) }}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID KI"
+      unique_id: kittec_cb40_pid_ki
+      state_topic: "Kittec_CB40/pidstats/ki"
+      icon: mdi:alpha-i-box-outline
+      value_template: "{{ value | float | round(2)| default (0) }}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "PID KD"
+      unique_id: kittec_cb40_pid_kd
+      state_topic: "Kittec_CB40/pidstats/kd"
+      icon: mdi:alpha-d-box-outline
+      value_template: "{{ value | float | round(2)| default (0) }}"
+      device:
+        identifiers: ["kittec_cb40"]
+
+    - name: "Power Output"
+      unique_id: kittec_cb40_power_out
+      state_topic: "Kittec_CB40/pidstats/out"
+      icon: mdi:chart-bell-curve
+      unit_of_measurement: "%"
+      value_template: >
+        {% set p = value | float(0)| default (0) %}
+        {{ (p * 100) }}
+
+      device:
+        identifiers: ["kittec_cb40"]
+     
+    binary_sensor:
+    - name: "Heat Active"
+      unique_id: kittec_cb40_kiln_heat_active
+      state_topic: "Kittec_CB40/heat"
+      device_class: heat
+      icon: mdi:fire
+      value_template: >
+        {% set h = value | float(0) | default (False) %}
+        {{ h > 0 }}
+      device:
+        identifiers: ["kittec_cb40"]
