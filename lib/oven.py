@@ -470,6 +470,9 @@ class Oven(threading.Thread):
         temp = 0
         try:
             temp = self.board.temp_sensor.temperature() + config.thermocouple_offset
+            temp_raw = self.board.temp_sensor.temperature() + config.thermocouple_offset
+            temp_comp=self.temperature_compensation(temp)
+            #Force to use compensated value if configured
             if config.tc_compensation:
                 temp=self.temperature_compensation(temp)
         except AttributeError as error:
@@ -483,6 +486,8 @@ class Oven(threading.Thread):
             'cost': self.cost,
             'runtime': self.runtime,
             'temperature': temp,
+            'temperature_comp': temp_comp,
+            'temperature_raw': temp_raw,
             'target': self.target,
             'state': self.state,
             'heat': self.heat,
