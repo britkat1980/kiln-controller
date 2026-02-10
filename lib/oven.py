@@ -462,6 +462,9 @@ class Oven(threading.Thread):
         temp = 0
         try:
             temp = self.board.temp_sensor.temperature() + config.thermocouple_offset
+            if config.tc_compensation and temp>540:
+                temp=(temp * 1.173) - 89
+                
         except AttributeError as error:
             # this happens at start-up with a simulated oven
             temp = 0
