@@ -3,7 +3,6 @@ import config
 import paho.mqtt.client as mqtt
 import json
 import time
-
 from oven import Oven
 log = logging.getLogger(__name__)
 
@@ -22,7 +21,6 @@ def on_disconnect(client, userdata, rc):
         client.reconnect()
     except Exception as e:
         log.error(f"Reconnection attempt failed: {e}")
-
 
 class OvenWatcher(threading.Thread):
     def __init__(self,oven):
@@ -73,6 +71,8 @@ class OvenWatcher(threading.Thread):
         self.client.loop_start()
 
     def run(self):
+        # On initiation publish the profiles to MQTT
+
         # Main loop: each iteration handles exceptions internally to stay alive
         while True:
             try:

@@ -13,6 +13,7 @@ import geventwebsocket
 from gevent.pywsgi import WSGIServer
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket import WebSocketError
+import paho.mqtt.client as mqtt
 
 # try/except removed here on purpose so folks can see why things break
 import config
@@ -352,7 +353,19 @@ def get_config():
         "kwh_rate": config.kwh_rate,
         "currency_type": config.currency_type})    
 
+def profile_mqtt():
+    client = mqtt.Client()
+    client.username_pw_set(config.mqtt_user, config.mqtt_pass)
+    #self.client.on_connect = on_connect
+    #self.client.on_disconnect = on_disconnect
+    client.connect(config.mqtt_host, config.mqtt_port)
+    profiles = get_profiles()
+    json_profiles = json.loads(profiles)
+    result = client.publish(config.mqtt_kiln_name+"/profiles", profiles,retain=True)
+    client.disconnect()
+
 def main():
+    profile_mqtt()
     ip = "0.0.0.0"
     port = config.listening_port
     log.info("listening on %s:%d" % (ip, port))
