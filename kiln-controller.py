@@ -354,6 +354,7 @@ def get_config():
         "currency_type": config.currency_type})    
 
 def profile_mqtt():
+    profile_list=[]
     client = mqtt.Client()
     client.username_pw_set(config.mqtt_user, config.mqtt_pass)
     #self.client.on_connect = on_connect
@@ -362,7 +363,8 @@ def profile_mqtt():
     profiles = get_profiles()
     json_profiles = json.loads(profiles)
     for profile in json_profiles:
-        result = client.publish(config.mqtt_kiln_name+"/profiles/"+profile['name'], json.dumps(profile['data']),retain=True)
+        profile_list.append(profile['name'])
+    result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(profile_list),retain=True)
     client.disconnect()
 
 def main():
