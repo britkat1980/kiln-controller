@@ -563,7 +563,7 @@ $(document).ready(function()
                        '<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span> ' +
                        '<span style="font-family: Digi; font-size: 40px;">' + eta_time + '</span> ' +
                        '<span class="glyphicon glyphicon-time" style="font-size: 12px; font-weight: normal"></span> ' +
-                       '<span style="font-family: Digi; font-size: 40px;">' + eta + '</span></span>');
+                       '<span style="font-family: Digi; font-size: 20px;">' + eta + '</span></span>');
                     $('#target_temp').html(parseInt(x.target));
                     $('#cost').html(x.currency_type + parseFloat(x.cost).toFixed(2));
                   
