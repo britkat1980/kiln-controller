@@ -355,6 +355,7 @@ def get_config():
 
 def profile_mqtt():
     profile_list=[]
+    json_out={}
     client = mqtt.Client()
     client.username_pw_set(config.mqtt_user, config.mqtt_pass)
     #self.client.on_connect = on_connect
@@ -364,7 +365,8 @@ def profile_mqtt():
     json_profiles = json.loads(profiles)
     for profile in json_profiles:
         profile_list.append(profile['name'])
-    result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(profile_list),retain=True)
+    json_out['profiles']=profile_list
+    result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(json_out),retain=True)
     client.disconnect()
 
 def main():
