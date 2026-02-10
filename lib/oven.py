@@ -458,7 +458,7 @@ class Oven(threading.Thread):
             cost = 0
         self.cost = self.cost + cost
 
-    def temperature_compensation(temp):
+    def temperature_compensation(self,temp):
         """
         Quadratic high‑temperature correction for MAX31855 → Fluke.
         Valid for ~564+.
@@ -470,11 +470,11 @@ class Oven(threading.Thread):
         temp = 0
         try:
             temp = self.board.temp_sensor.temperature() + config.thermocouple_offset
-            temp_raw = self.board.temp_sensor.temperature() + config.thermocouple_offset
+            temp_raw = temp
             temp_comp=self.temperature_compensation(temp)
             #Force to use compensated value if configured
             if config.tc_compensation:
-                temp=self.temperature_compensation(temp)
+                temp=temp_comp
         except AttributeError as error:
             # this happens at start-up with a simulated oven
             temp = 0
