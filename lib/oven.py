@@ -458,12 +458,13 @@ class Oven(threading.Thread):
             cost = 0
         self.cost = self.cost + cost
 
-    def temperature_compensation(self,temp):
+    def temperature_compensation(self,t_max):
         """
-        Quadratic high‑temperature correction for MAX31855 → Fluke.
-        Valid for ~564+.
+        Quadratic correction for MAX31855 → Fluke.
+        Valid for ~564–1000°C.
         """
-        return 0.000247 * (temp ** 2) + 0.808 * temp + 108
+        return 0.000228 * (t_max ** 2) + 0.842 * t_max + 78.6
+
 
 
     def get_state(self):
