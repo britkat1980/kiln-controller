@@ -473,7 +473,7 @@ class Oven(threading.Thread):
             temp_raw = self.board.temp_sensor.temperature() 
             #Force to use compensated value if configured
             if config.tc_compensation and temp_raw > 550:
-                temp_comp=self.temperature_compensation(temp)
+                temp_comp=self.temperature_compensation(temp_raw)
             else:
                 temp_comp = temp_raw + config.thermocouple_offset
             temp=temp_comp
