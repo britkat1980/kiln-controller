@@ -361,7 +361,8 @@ def profile_mqtt():
     client.connect(config.mqtt_host, config.mqtt_port)
     profiles = get_profiles()
     json_profiles = json.loads(profiles)
-    result = client.publish(config.mqtt_kiln_name+"/profiles", profiles,retain=True)
+    for profile in json_profiles:
+        result = client.publish(config.mqtt_kiln_name+"/profiles/"+profile['name'], json.dumps(profile['data']),retain=True)
     client.disconnect()
 
 def main():
