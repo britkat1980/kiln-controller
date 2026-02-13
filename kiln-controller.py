@@ -308,6 +308,8 @@ def save_profile(profile, force=False):
         f.write(profile_json)
         f.close()
     log.info("Wrote %s" % filepath)
+    #always publish new profile data to MQTT
+    profile_mqtt()
     return True
 
 def add_temp_units(profile):
@@ -321,7 +323,7 @@ def add_temp_units(profile):
     if config.temp_scale=="c":
         return profile
     if config.temp_scale=="f":
-        profile=convert_to_c(profile);
+        profile=convert_to_c(profile)
         return profile
 
 def convert_to_c(profile):
@@ -366,21 +368,26 @@ def get_config():
         "currency_type": config.currency_type})    
 
 def profile_mqtt():
-    profile_list=[]
-    json_out={}
-    client = mqtt.Client()
-    client.username_pw_set(config.mqtt_user, config.mqtt_pass)
-    #self.client.on_connect = on_connect
-    #self.client.on_disconnect = on_disconnect
-    client.connect(config.mqtt_host, config.mqtt_port)
-    profiles = get_profiles()
-    json_profiles = json.loads(profiles)
-    for profile in json_profiles:
-        profile_list.append(profile['name'])
-    json_out['profiles']=profile_list
-    result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(json_out),retain=True)
-    result = client.publish(config.mqtt_kiln_name+"/profiles/data", profiles,retain=True)
-    client.disconnect()
+    # Onl;y do this if MQTT is enabled in config
+    if config.mqtt_enabled:
+        try:
+            profile_list=[]
+            json_out={}
+            client = mqtt.Client()
+            client.username_pw_set(config.mqtt_user, config.mqtt_pass)
+            #self.client.on_connect = on_connect
+            #self.client.on_disconnect = on_disconnect
+            client.connect(config.mqtt_host, config.mqtt_port)
+            profiles = get_profiles()
+            json_profiles = json.loads(profiles)
+            for profile in json_profiles:
+                profile_list.append(profile['name'])
+            json_out['profiles']=profile_list
+            result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(json_out),retain=True)
+            result = client.publish(config.mqtt_kiln_name+"/profiles/data", profiles,retain=True)
+            client.disconnect()
+        except:
+            log.error("MQTT publish failed. Check config.")
 
 def main():
     profile_mqtt()
