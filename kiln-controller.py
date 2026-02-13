@@ -372,18 +372,17 @@ def profile_mqtt():
     if config.mqtt_enabled:
         try:
             profile_list=[]
+            schedules={}
             json_out={}
             client = mqtt.Client()
             client.username_pw_set(config.mqtt_user, config.mqtt_pass)
-            #self.client.on_connect = on_connect
-            #self.client.on_disconnect = on_disconnect
             client.connect(config.mqtt_host, config.mqtt_port)
-            profiles = get_profiles()
-            json_profiles = json.loads(profiles)
+            json_profiles = json.loads(get_profiles())
             for profile in json_profiles:
                 profile_list.append(profile['name'])
+                schedules[profile['name']]=profile['data']
             json_out['names']=profile_list
-            json_out['profiles']=json_profiles
+            json_out['profiles']=schedules
             result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(json_out),retain=True)
             client.disconnect()
         except:

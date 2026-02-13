@@ -240,21 +240,15 @@ mqtt:
       value_template: "{{ value_json.names }}"
       device:
         identifiers: ["kittec_cb40"]
-    - name: "Kiln Schedules"
-      unique_id: kittec_cb40_kiln_schedules
-      state_topic: "Kittec_CB40/profiles"
-      value_template: "{{ value_json.profiles }}"
-      device:
-        identifiers: ["kittec_cb40"]
 
 template:
   # 1) Triggered template sensor
   - trigger:
       - platform: mqtt
-        topic: kiln/profiles
+        topic: "Kittec_CB40/profiles"
     sensor:
-      - name: "Kiln Profiles"
-        unique_id: kiln_profiles
+      - name: "Kiln Schedules"
+        unique_id: kiln_schedules
         state: "ok"
         attributes: >
           {% set obj = trigger.payload | from_json %}

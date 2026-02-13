@@ -381,7 +381,7 @@ class Oven(threading.Thread):
         if allow_seek:
             if self.state == 'IDLE':
                 if config.seek_start:
-                    temp = self.board.temp_sensor.temperature()  # Defined in a subclass
+                    temp = self.compensate_temp() # Defined in a subclass
                     runtime += self.get_start_from_temperature(profile, temp)
 
         self.reset()
@@ -405,8 +405,7 @@ class Oven(threading.Thread):
         '''shift the whole schedule forward in time by one time_step
         to wait for the kiln to catch up'''
         if config.kiln_must_catch_up == True:
-            temp = self.board.temp_sensor.temperature() + \
-                config.thermocouple_offset
+            temp = self.compensate_temp()
             # kiln too cold, wait for it to heat up
             if self.target - temp > config.pid_control_window:
                 log.info("kiln must catch up, too cold, shifting schedule")
@@ -434,7 +433,7 @@ class Oven(threading.Thread):
 
     def reset_if_emergency(self):
         '''reset if the temperature is way TOO HOT, or other critical errors detected'''
-        if (self.board.temp_sensor.temperature() + config.thermocouple_offset >=
+        if (self.compensate_temp() >=
             config.emergency_shutoff_temp):
             log.info("emergency!!! temperature too high")
             if config.ignore_temp_too_high == False:
@@ -465,18 +464,23 @@ class Oven(threading.Thread):
         """
         return 0.000228 * (t_max ** 2) + 0.842 * t_max + 78.6
 
-
+    def compensate_temp(self):
+        temp = 0
+        temp_raw = round(self.board.temp_sensor.temperature(),2)
+        #Force to use compensated value if configured
+        if config.tc_compensation and temp_raw > 550:
+            temp=round(self.temperature_compensation(temp_raw),2)
+        else:
+            temp = temp_raw + config.thermocouple_offset
+        return temp
+        
 
     def get_state(self):
         temp = 0
         try:
             temp_raw = round(self.board.temp_sensor.temperature(),2)
-            #Force to use compensated value if configured
-            if config.tc_compensation and temp_raw > 550:
-                temp_comp=round(self.temperature_compensation(temp_raw),2)
-            else:
-                temp_comp = temp_raw + config.thermocouple_offset
-            temp=temp_comp
+            temp_comp=round(self.temperature_compensation(temp_raw),2)
+            temp = self.compensate_temp()
 
         except AttributeError as error:
             # this happens at start-up with a simulated oven
@@ -651,8 +655,7 @@ class SimulatedOven(Oven):
     def heat_then_cool(self):
         now_simulator = self.start_time + datetime.timedelta(milliseconds = self.runtime * 1000)
         pid = self.pid.compute(self.target,
-                               self.board.temp_sensor.temperature() +
-                               config.thermocouple_offset, now_simulator)
+                               self.compensate_temp(), now_simulator)
 
         heat_on = float(self.time_step * pid)
         heat_off = float(self.time_step * (1 - pid))
@@ -714,8 +717,7 @@ class RealOven(Oven):
 
     def heat_then_cool(self):
         pid = self.pid.compute(self.target,
-                               self.board.temp_sensor.temperature() +
-                               config.thermocouple_offset, datetime.datetime.now())
+                               self.compensate_temp(), datetime.datetime.now())
 
         heat_on = float(self.time_step * pid)
         heat_off = float(self.time_step * (1 - pid))
