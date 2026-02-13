@@ -41,6 +41,14 @@ ovenWatcher = OvenWatcher(oven)
 # this ovenwatcher is used in the oven class for restarts
 oven.set_ovenwatcher(ovenWatcher)
 
+import subprocess
+
+def restart_kiln_controller():
+    subprocess.run(
+        ["sudo", "service", "kiln-controller", "restart"],
+        check=True
+    )
+
 @app.route('/')
 def index():
     return bottle.redirect('/picoreflow/index.html')
@@ -112,6 +120,10 @@ def handle_api():
     if bottle.request.json['cmd'] == 'stop':
         log.info("api stop command received")
         oven.abort_run()
+
+    if bottle.request.json['cmd'] == 'restart':
+        log.info("api service restart command received")
+        restart_kiln_controller()
 
     if bottle.request.json['cmd'] == 'memo':
         log.info("api memo command received")
@@ -367,6 +379,7 @@ def profile_mqtt():
         profile_list.append(profile['name'])
     json_out['profiles']=profile_list
     result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(json_out),retain=True)
+    result = client.publish(config.mqtt_kiln_name+"/profiles/data", profiles,retain=True)
     client.disconnect()
 
 def main():
