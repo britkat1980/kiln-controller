@@ -382,9 +382,9 @@ def profile_mqtt():
             json_profiles = json.loads(profiles)
             for profile in json_profiles:
                 profile_list.append(profile['name'])
-            json_out['profiles']=profile_list
+            json_out['names']=profile_list
+            json_out['profiles']=json_profiles
             result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(json_out),retain=True)
-            result = client.publish(config.mqtt_kiln_name+"/profiles/data", profiles,retain=True)
             client.disconnect()
         except:
             log.error("MQTT publish failed. Check config.")
