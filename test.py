@@ -1,13 +1,25 @@
 def fluke_from_max(t):
     """
-    Piecewise calibration optimised for MAX31855 above 564°C.
-    Continuous at 750°C.
+    Three-region calibration for MAX31855 → Fluke.
+
+    - 0–300°C:   identity (matches your low-temp data)
+    - 300–750°C: high-temp segment 1 (already fitted)
+    - >750°C:    high-temp segment 2 (continuity-adjusted)
+
+    High-temp behaviour (>564°C) is unchanged from your tuned model.
     """
-    if t <= 750:
-        # Segment 1: 564–750°C
+
+    if t <= 300:
+        # Low range: your data is effectively y = x
+        return t
+
+    elif t <= 750:
+        # Mid/high range segment 1 (includes 564–750°C region you tuned)
         return 1.085 * t - 20.7
+
     else:
-        # Segment 2: 750–1000°C (continuity-adjusted)
+        # High range segment 2, continuity-adjusted at 750°C
         return 1.155 * t - 71.5
 
-print (fluke_from_max(950))
+
+print (fluke_from_max(820))
