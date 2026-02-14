@@ -108,6 +108,8 @@ def handle_api():
         profile = Profile(profile_json)
         oven.run_profile(profile, startat=startat, allow_seek=allow_seek)
         ovenWatcher.record(profile)
+        # publish start_time
+        
 
     if bottle.request.json['cmd'] == 'pause':
         log.info("api pause command received")
