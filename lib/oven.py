@@ -459,10 +459,33 @@ class Oven(threading.Thread):
 
     def temperature_compensation(self,t_max):
         """
-        Quadratic correction for MAX31855 → True.
-        Valid for ~564–1000°C.
+        Smooth correction for MAX31855 → Fluke across full range.
+        - Below ~300°C: essentially identity (no correction)
+        - Above ~550°C: full quadratic correction
+        - 300–550°C: smooth blend between the two
         """
-        return 0.000228 * (t_max ** 2) + 0.842 * t_max + 78.6
+
+        # High-temp quadratic (your 564–1000°C fit)
+        def high_corr(x):
+            return 0.000228 * (x ** 2) + 0.842 * x + 78.6
+
+        # Low-temp model: identity (matches your 122, 173, 295 points)
+        def low_corr(x):
+            return x
+
+        # Blend region
+        t1 = 300.0  # start blending
+        t2 = 550.0  # end blending
+
+        if t_max <= t1:
+            return low_corr(t_max)
+        elif t_max >= t2:
+            return high_corr(t_max)
+        else:
+            # Linear weight from 0 → 1 between t1 and t2
+            w = (t_max - t1) / (t2 - t1)
+            return (1 - w) * low_corr(t_max) + w * high_corr(t_max)
+
 
     def compensate_temp(self):
         temp = 0
