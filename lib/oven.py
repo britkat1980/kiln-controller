@@ -338,7 +338,6 @@ class Oven(threading.Thread):
         self.state = "IDLE"
         self.profile = None
         self.start_time = 0
-        self.starttime = 0
         self.runtime = 0
         self.totaltime = 0
         self.target = 0
@@ -391,7 +390,6 @@ class Oven(threading.Thread):
         self.start_time = datetime.datetime.now() - datetime.timedelta(seconds=self.startat)
         self.profile = profile
         self.totaltime = profile.get_duration()
-        self.starttime - datetime.datetime.now().isoformat()
         self.state = "RUNNING"
         log.info("Running schedule %s starting at %d minutes" % (profile.name,startat))
         log.info("Starting")
