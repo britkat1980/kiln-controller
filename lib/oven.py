@@ -479,8 +479,6 @@ class Oven(threading.Thread):
             return 0.000842 * (t ** 2) + 0.0831 * t + 199.7
 
 
-
-
     def compensate_temp(self):
         temp = 0
         #Force to use compensated value if configured

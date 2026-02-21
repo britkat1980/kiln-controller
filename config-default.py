@@ -286,5 +286,5 @@ mqtt_host = 'example.com'
 mqtt_port = 1883
 mqtt_user = 'my_user'
 mqtt_pass = 'my_passwd'
-mqtt_topic = 'kiln/sensor'
 mqtt_kiln_name = 'My Kiln'
+mqtt_time = 30

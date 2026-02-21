@@ -3,6 +3,7 @@ import config
 import paho.mqtt.client as mqtt
 import json
 import time
+from datetime import datetime, timedelta
 from oven import Oven
 log = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class OvenWatcher(threading.Thread):
 
     def run(self):
         # On initiation publish the profiles to MQTT
-
+        last_push_date=datetime.now()-timedelta(minutes=1)
         # Main loop: each iteration handles exceptions internally to stay alive
         while True:
             try:
@@ -88,7 +89,7 @@ class OvenWatcher(threading.Thread):
                 self.notify_all(oven_state)
 
                 # Publish temperature to MQTT topic
-                if config.mqtt_enabled:
+                if config.mqtt_enabled and datetime.now() - last_push_date > timedelta(seconds=config.mqtt_time):
                     oven_state["name"] = config.mqtt_kiln_name
                     payload = json.dumps(oven_state)
 
@@ -107,7 +108,7 @@ class OvenWatcher(threading.Thread):
                             if result.rc != mqtt.MQTT_ERR_SUCCESS:
                                 log.error(f"Publish failed, code: {result.rc}")
                                 break
-
+                    last_push_date=datetime.now()
             except Exception as exc:
                 log.exception(f"Exception in OvenWatcher iteration: {exc}")
 
