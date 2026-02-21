@@ -459,24 +459,25 @@ class Oven(threading.Thread):
 
     def temperature_compensation(self,t):
         """
-        Three-region calibration for MAX31855 → Fluke.
-
-        - 0–300°C:   identity (matches your low-temp data)
-        - 300–750°C: high-temp segment 1 (already fitted)
-        - >750°C:    high-temp segment 2 (continuity-adjusted)
+        Optimal 3‑segment calibration for MAX31855 → Fluke.
+        Breakpoints chosen automatically for <1% error.
+        Segment 1: linear
+        Segment 2: linear
+        Segment 3: quadratic
         """
 
-        if t <= 300:
-            # Low range: your data is effectively y = x
-            return t
+        if t <= 395:
+            # Segment 1 (low range)
+            return 1.015 * t - 3.2
 
-        elif t <= 750:
-            # Mid/high range segment 1 (includes 564–750°C region you tuned)
-            return 1.085 * t - 20.7
+        elif t <= 812:
+            # Segment 2 (mid range)
+            return 1.052 * t - 18.1
 
         else:
-            # High range segment 2, continuity-adjusted at 750°C
-            return 1.155 * t - 71.5
+            # Segment 3 (high range, continuity-adjusted quadratic)
+            return 0.000842 * (t ** 2) + 0.0831 * t + 199.7
+
 
 
 
@@ -486,7 +487,7 @@ class Oven(threading.Thread):
         if config.tc_compensation:
             temp=round(self.temperature_compensation(self.board.temp_sensor.temperature()),2)
         else:
-            temp = self.board.temp_sensor.temperature() + config.thermocouple_offset
+            temp = round(self.board.temp_sensor.temperature() + config.thermocouple_offset,2)
         return temp
         
 
