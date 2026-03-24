@@ -370,7 +370,7 @@ def get_config():
         "currency_type": config.currency_type})    
 
 def profile_mqtt():
-    # Onl;y do this if MQTT is enabled in config
+    # Only do this if MQTT is enabled in config
     if config.mqtt_enabled:
         try:
             profile_list=[]
