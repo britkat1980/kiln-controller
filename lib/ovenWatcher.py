@@ -107,7 +107,7 @@ class OvenWatcher(threading.Thread):
                             if topic in["runtime", "totaltime"]:
                                 td = timedelta(seconds=oven_state[topic])
                                 result = self.client.publish(config.mqtt_kiln_name+"/"+topic, str(td))
-                            elif isinstance(oven_state[topic],[int, float]):
+                            elif isinstance(oven_state[topic],(int, float)):
                                 result = self.client.publish(config.mqtt_kiln_name+"/"+topic, round(oven_state[topic],2))
                             else:
                                 result = self.client.publish(config.mqtt_kiln_name+"/"+topic, oven_state[topic])
