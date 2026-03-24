@@ -29,13 +29,13 @@ class EType:
 class Entity_Type():
     entity_type={
         "cost":EType("sensor","money","",False,"mdi:currency-gbp"),
-        "runtime":EType("sensor","number","",False,"mdi:timer-outline"),
+        "runtime":EType("sensor","timestamp","",False,"mdi:timer-outline"),
         "temperature":EType("sensor","temperature","",False,"mdi:thermometer"),
         "target":EType("sensor","temperature","",False,"mdi:thermometer-check"),
         "state":EType("sensor","string","",False,"mdi:progress-clock"),
         "heat":EType("binary_sensor","","",False,"mdi:fire"),
         "heat_rate":EType("sensor","number","",False,"mdi:fire-circle"),
-        "totaltime":EType("sensor","number","Program_Duration",False,"mdi:timer-outline"),
+        "totaltime":EType("sensor","timestamp","Program_Duration",False,"mdi:timer-outline"),
         "catching_up":EType("binary_sensor","","",False,"mdi:run-fast"),
         "name":EType("sensor","string","",False,""),
         "profiles":EType("select","","",False,""),
@@ -458,7 +458,9 @@ def profile_mqtt():
                     if "state_class" in tempObj:
                         del tempObj['state_class']
                     tempObj['device_class']="Monetary"
-                    tempObj['icon_template']= "mdi:currency-gbp"
+                if entities[item].sensorClass=="timestamp":
+                    tempObj['device_class']="timestamp"
+                    tempObj['state_class']="measurement"
             elif entities[item].devType=="button":
                 tempObj["command_topic"]=config.mqtt_kiln_name+"/"+item+"/set"
 
