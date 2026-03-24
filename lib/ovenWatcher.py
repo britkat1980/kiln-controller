@@ -104,7 +104,10 @@ class OvenWatcher(threading.Thread):
                                     log.error(f"Publish failed, code: {result.rc}")
                                     break
                         else:
-                            result = self.client.publish(config.mqtt_kiln_name+"/"+topic, oven_state[topic])
+                            if isinstance(oven_state[topic],[int, float]):
+                                result = self.client.publish(config.mqtt_kiln_name+"/"+topic, round(oven_state[topic],2))
+                            else:
+                                result = self.client.publish(config.mqtt_kiln_name+"/"+topic, oven_state[topic])
                             if result.rc != mqtt.MQTT_ERR_SUCCESS:
                                 log.error(f"Publish failed, code: {result.rc}")
                                 break

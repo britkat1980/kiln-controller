@@ -19,44 +19,44 @@ import paho.mqtt.client as mqtt
 import config
 
 class EType:
-    def __init__(self,dT,sC,name,iP:False):
+    def __init__(self,dT,sC,name,iP:False,iC):
         self.devType = dT
         self.sensorClass=sC
         self.friendly_name=name
         self.isPID=iP
+        self.icon=iC
 
 class Entity_Type():
     entity_type={
-        "cost":EType("sensor","money","",False),
-        "runtime":EType("sensor","number","",False),
-        "temperature":EType("sensor","temperature","",False),
-        "target":EType("sensor","temperature","",False),
-        "target":EType("sensor","temperature","",False),
-        "state":EType("sensor","string","",False),
-        "heat":EType("binary_sensor","","",False),
-        "heat_rate":EType("sensor","number","",False),
-        "totaltime":EType("sensor","number","Program_Duration",False),
-        "catching_up":EType("binary_sensor","","",False),
-        "name":EType("sensor","string","",False),
-        "profiles":EType("select","","",False),
-        "Restart_Program":EType("button","","",False),
-        "Start_Program":EType("button","","",False),
-        "Stop_Program":EType("button","","",False),
+        "cost":EType("sensor","money","",False,"mdi:currency-gbp"),
+        "runtime":EType("sensor","number","",False,"mdi:timer-outline"),
+        "temperature":EType("sensor","temperature","",False,"mdi:thermometer"),
+        "target":EType("sensor","temperature","",False,"mdi:thermometer-check"),
+        "state":EType("sensor","string","",False,"mdi:progress-clock"),
+        "heat":EType("binary_sensor","","",False,"mdi:fire"),
+        "heat_rate":EType("sensor","number","",False,"mdi:fire-circle"),
+        "totaltime":EType("sensor","number","Program_Duration",False,"mdi:timer-outline"),
+        "catching_up":EType("binary_sensor","","",False,"mdi:run-fast"),
+        "name":EType("sensor","string","",False,""),
+        "profiles":EType("select","","",False,""),
+        "Restart_Program":EType("button","","",False,""),
+        "Start_Program":EType("button","","",False,""),
+        "Stop_Program":EType("button","","",False,""),
 #PIDSTATS
-        "time":EType("sensor","number","PID Time",True),
-        "timedelta":EType("sensor","number","PID_Time_Delta",True),
-        "setpoint":EType("sensor","number","PID_Setpoint",True),
-        "ispoint":EType("sensor","number","",True),
-        "err":EType("sensor","number","",True),
-        "errDelta":EType("sensor","number","",True),
-        "p":EType("sensor","number","",True),
-        "i":EType("sensor","number","",True),
-        "d":EType("sensor","number","",True),
-        "kp":EType("sensor","number","",True),
-        "ki":EType("sensor","number","",True),
-        "kd":EType("sensor","number","",True),
-        "pid":EType("sensor","number","",True),
-        "out":EType("sensor","number","Power_Output",True)
+        "time":EType("sensor","number","PID Time",True,"mdi:clock-outline"),
+        "timedelta":EType("sensor","number","PID_Time_Delta",True,"mdi:timer-sand"),
+        "setpoint":EType("sensor","number","PID_Setpoint",True,"mdi:thermometer-check"),
+        "ispoint":EType("sensor","number","",True,"mdi:thermometer"),
+        "err":EType("sensor","number","",True,"mdi:alert-circle-outline"),
+        "errDelta":EType("sensor","number","",True,"mdi:delta"),
+        "p":EType("sensor","number","",True,"mdi:alpha-p-circle-outline"),
+        "i":EType("sensor","number","",True,"mdi:alpha-i-circle-outline"),
+        "d":EType("sensor","number","",True,"mdi:alpha-d-circle-outline"),
+        "kp":EType("sensor","number","",True,"mdi:alpha-p-box-outline"),
+        "ki":EType("sensor","number","",True,"mdi:alpha-i-box-outline"),
+        "kd":EType("sensor","number","",True,"mdi:alpha-d-box-outline"),
+        "pid":EType("sensor","number","",True,""),
+        "out":EType("sensor","number","Power_Output",True,"mdi:chart-bell-curve")
     }
 
 
@@ -436,6 +436,8 @@ def profile_mqtt():
             tempObj['device']['manufacturer']=config.mqtt_kiln_name
             tempObj['device']['identifiers']=config.mqtt_kiln_name
             tempObj['device']['name']=config.mqtt_kiln_name
+            if not entities[item].icon=="":
+                tempObj["icon"]=entities[item].icon
 
 # Add sensor specific details
             if entities[item].devType=="select":
