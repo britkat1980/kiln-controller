@@ -18,6 +18,47 @@ import paho.mqtt.client as mqtt
 # try/except removed here on purpose so folks can see why things break
 import config
 
+class EType:
+    def __init__(self,dT,sC,name,iP:False):
+        self.devType = dT
+        self.sensorClass=sC
+        self.friendly_name=name
+        self.isPID=iP
+
+class Entity_Type():
+    entity_type={
+        "cost":EType("sensor","money",""),
+        "runtime":EType("sensor","number",""),
+        "temperature":EType("sensor","temperature",""),
+        "target":EType("sensor","temperature",""),
+        "state":EType("sensor","string",""),
+        "heat":EType("binary_sensor","",""),
+        "heat_rate":EType("sensor","number",""),
+        "totaltime":EType("sensor","number","Program_Duration"),
+        "catching_up":EType("binary_sensor","",""),
+        "name":EType("sensor","string",""),
+        "profiles":EType("select","",""),
+        "Restart_Program":EType("button","",""),
+        "Start_Program":EType("button","",""),
+        "Stop_Program":EType("button","",""),     
+#PIDSTATS
+        "time":EType("sensor","number","PID Time",True),
+        "timedelta":EType("sensor","number","PID_Time_Delta",True),
+        "setpoint":EType("sensor","number","PID_Setpoint",True),
+        "ispoint":EType("sensor","number","",True),
+        "err":EType("sensor","number","",True),
+        "errDelta":EType("sensor","number","",True),
+        "p":EType("sensor","number","",True),
+        "i":EType("sensor","number","",True),
+        "d":EType("sensor","number","",True),
+        "kp":EType("sensor","number","",True),
+        "ki":EType("sensor","number","",True),
+        "kd":EType("sensor","number","",True),
+        "pid":EType("sensor","number","",True),
+        "out":EType("sensor","number","Power_Output",True)
+    }
+
+
 logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
@@ -42,6 +83,10 @@ ovenWatcher = OvenWatcher(oven)
 oven.set_ovenwatcher(ovenWatcher)
 
 import subprocess
+
+def ha_discovery(entities):
+    
+    return True
 
 def restart_kiln_controller():
     subprocess.run(
@@ -190,15 +235,6 @@ def handle_control():
                     ovenWatcher.record(profile)
                 elif msgdict.get("cmd") == "SIMULATE":
                     log.info("SIMULATE command received")
-                    #profile_obj = msgdict.get('profile')
-                    #if profile_obj:
-                    #    profile_json = json.dumps(profile_obj)
-                    #    profile = Profile(profile_json)
-                    #simulated_oven = Oven(simulate=True, time_step=0.05)
-                    #simulation_watcher = OvenWatcher(simulated_oven)
-                    #simulation_watcher.add_observer(wsock)
-                    #simulated_oven.run_profile(profile)
-                    #simulation_watcher.record(profile)
                 elif msgdict.get("cmd") == "STOP":
                     log.info("Stop command received")
                     oven.abort_run()
@@ -372,20 +408,73 @@ def get_config():
 def profile_mqtt():
     # Only do this if MQTT is enabled in config
     if config.mqtt_enabled:
+        # Get entity list and create disco messages
+        disco_messages={}
+
+        entities=Entity_Type().entity_type
+        for item in entities:
+# Add general details
+            tempObj={}
+            if entities[item].isPID:
+                tempObj['stat_t']=str(config.mqtt_kiln_name+"/pidstats/"+item).replace(" ","_")
+            else:
+                tempObj['stat_t']=str(config.mqtt_kiln_name+"/"+item).replace(" ","_")
+            tempObj['avty_t'] = config.mqtt_kiln_name+"/status"
+            tempObj["pl_avail"]= "online"
+            tempObj["pl_not_avail"]= "offline"
+            tempObj['device']={}
+            if entities[item].friendly_name=="":
+                tempObj["name"]=item.replace("_"," ") #Just final bit past the last "/"
+                tempObj['unique_id']=config.mqtt_kiln_name+"_"+item
+                tempObj['default_entity_id']=entities[item].devType+"."+config.mqtt_kiln_name+"_"+item
+            else:
+                tempObj["name"]=entities[item].friendly_name
+                tempObj['unique_id']=config.mqtt_kiln_name+"_"+entities[item].friendly_name
+                tempObj['default_entity_id']=entities[item].devType+"."+config.mqtt_kiln_name+"_"+entities[item].friendly_name
+            tempObj['device']['model']=config.mqtt_kiln_name
+            tempObj['device']['manufacturer']=config.mqtt_kiln_name
+            tempObj['device']['identifiers']=config.mqtt_kiln_name
+            tempObj['device']['name']=config.mqtt_kiln_name
+
+# Add sensor specific details
+            if entities[item].devType=="select":
+                tempObj["command_topic"]=config.mqtt_kiln_name+"/"+item+"/set"
+                tempObj['stat_t']=config.mqtt_kiln_name+"/profile"
+                json_profiles = json.loads(get_profiles())
+                profile_list=[]
+                for profile in json_profiles:
+                    profile_list.append(profile['name'])
+                tempObj["options"]=profile_list
+            elif entities[item].devType=="sensor":
+                if entities[item].sensorClass=="temperature":
+                    tempObj['unit_of_meas']="°C"
+                    tempObj['device_class']="Temperature"
+                    tempObj['state_class']="measurement"
+                if entities[item].sensorClass=="money":
+                    tempObj['unit_of_meas']="{GBP}"
+                    if "state_class" in tempObj:
+                        del tempObj['state_class']
+                    tempObj['device_class']="Monetary"
+                    tempObj['icon_template']= "mdi:currency-gbp"
+            elif entities[item].devType=="button":
+                tempObj["command_topic"]=config.mqtt_kiln_name+"/"+item+"/set"
+
+            disco_messages[item]=[entities[item].devType, tempObj]
+        #publish messages
         try:
-            profile_list=[]
-            schedules={}
-            json_out={}
             client = mqtt.Client()
+            client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "kiln_controller")
             client.username_pw_set(config.mqtt_user, config.mqtt_pass)
             client.connect(config.mqtt_host, config.mqtt_port)
-            json_profiles = json.loads(get_profiles())
-            for profile in json_profiles:
-                profile_list.append(profile['name'])
-                schedules[profile['name']]=profile['data']
-            json_out['names']=profile_list
-            json_out['profiles']=schedules
-            result = client.publish(config.mqtt_kiln_name+"/profiles", json.dumps(json_out),retain=True)
+            client.publish("Kittec_CB40/status","online")
+            for item in disco_messages:
+                if disco_messages[item][0]=="sensor":
+                    pubtopic="homeassistant/sensor/kiln_controller"+"/"+item+"/config"
+                elif disco_messages[item][0]=="select":
+                    pubtopic="homeassistant/select/kiln_controller"+"/"+item+"/config"
+                elif disco_messages[item][0]=="button":
+                    pubtopic="homeassistant/button/kiln_controller"+"/"+item+"/config"
+                client.publish(pubtopic, json.dumps(disco_messages[item][1]),retain=True)
             client.disconnect()
         except:
             log.error("MQTT publish failed. Check config.")
