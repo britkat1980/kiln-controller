@@ -134,7 +134,7 @@ class OvenWatcher(threading.Thread):
     def record(self, profile):
         self.last_profile = profile
         self.last_log = []
-        self.started = datetime.datetime.now()
+        self.started = datetime.now()
         self.recording = True
         #we just turned on, add first state for nice graph
         self.last_log.append(self.oven.get_state())
