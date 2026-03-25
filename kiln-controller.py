@@ -29,7 +29,8 @@ class EType:
 class Entity_Type():
     entity_type={
         "cost":EType("sensor","money","",False,"mdi:currency-gbp"),
-        "runtime":EType("sensor","string","Program End Time",False,"mdi:timer-outline"),
+        "runtime":EType("sensor","string","Program Running Time",False,"mdi:timer-outline"),
+        "endtime":EType("sensor","string","Program End Time",False,"mdi:timer-outline"),
         "temperature":EType("sensor","temperature","",False,"mdi:thermometer"),
         "target":EType("sensor","temperature","",False,"mdi:thermometer-check"),
         "state":EType("sensor","string","",False,"mdi:progress-clock"),
