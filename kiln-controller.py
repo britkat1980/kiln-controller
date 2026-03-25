@@ -29,13 +29,13 @@ class EType:
 class Entity_Type():
     entity_type={
         "cost":EType("sensor","money","",False,"mdi:currency-gbp"),
-        "endtime":EType("sensor","timestamp","Program End Time",False,"mdi:timer-outline"),
+        "runtime":EType("sensor","string","Program End Time",False,"mdi:timer-outline"),
         "temperature":EType("sensor","temperature","",False,"mdi:thermometer"),
         "target":EType("sensor","temperature","",False,"mdi:thermometer-check"),
         "state":EType("sensor","string","",False,"mdi:progress-clock"),
         "heat":EType("binary_sensor","","",False,"mdi:fire"),
         "heat_rate":EType("sensor","number","",False,"mdi:fire-circle"),
-        "totaltime":EType("sensor","number","Program Duration",False,"mdi:timer-outline"),
+        "totaltime":EType("sensor","string","Program Duration",False,"mdi:timer-outline"),
         "catching_up":EType("binary_sensor","","",False,"mdi:run-fast"),
         "name":EType("sensor","string","",False,""),
         "profiles":EType("select","","",False,""),
