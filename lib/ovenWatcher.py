@@ -104,9 +104,9 @@ class OvenWatcher(threading.Thread):
                                     log.error(f"Publish failed, code: {result.rc}")
                                     break
                         else:
-                            if topic in["totaltime"]:
+                            if topic in["runtime", "totaltime"]:
                                 td = timedelta(seconds=oven_state[topic])
-                                result = self.client.publish(config.mqtt_kiln_name+"/"+topic, str(td))
+                                result = self.client.publish(config.mqtt_kiln_name+"/"+topic, str(td).split(".")[0])
                             elif isinstance(oven_state[topic],(int, float)):
                                 result = self.client.publish(config.mqtt_kiln_name+"/"+topic, round(oven_state[topic],2))
                             else:
