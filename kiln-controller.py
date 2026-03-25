@@ -457,7 +457,6 @@ def profile_mqtt():
                     tempObj['device_class']="Monetary"
                 if entities[item].sensorClass=="timestamp":
                     tempObj['device_class']="timestamp"
-                    tempObj['state_class']="measurement"
             elif entities[item].devType=="button":
                 tempObj["command_topic"]=config.mqtt_kiln_name+"/"+item+"/set"
             elif entities[item].devType=="binary_sensor":
