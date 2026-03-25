@@ -29,13 +29,13 @@ class EType:
 class Entity_Type():
     entity_type={
         "cost":EType("sensor","money","",False,"mdi:currency-gbp"),
-        "runtime":EType("sensor","timestamp","",False,"mdi:timer-outline"),
+        "endtime":EType("sensor","timestamp","Program End Time",False,"mdi:timer-outline"),
         "temperature":EType("sensor","temperature","",False,"mdi:thermometer"),
         "target":EType("sensor","temperature","",False,"mdi:thermometer-check"),
         "state":EType("sensor","string","",False,"mdi:progress-clock"),
         "heat":EType("binary_sensor","","",False,"mdi:fire"),
         "heat_rate":EType("sensor","number","",False,"mdi:fire-circle"),
-        "totaltime":EType("sensor","timestamp","Program_Duration",False,"mdi:timer-outline"),
+        "totaltime":EType("sensor","number","Program Duration",False,"mdi:timer-outline"),
         "catching_up":EType("binary_sensor","","",False,"mdi:run-fast"),
         "name":EType("sensor","string","",False,""),
         "profiles":EType("select","","",False,""),
@@ -43,9 +43,9 @@ class Entity_Type():
         "Start_Program":EType("button","","",False,""),
         "Stop_Program":EType("button","","",False,""),
 #PIDSTATS
-        "time":EType("sensor","number","PID Time",True,"mdi:clock-outline"),
-        "timedelta":EType("sensor","number","PID_Time_Delta",True,"mdi:timer-sand"),
-        "setpoint":EType("sensor","number","PID_Setpoint",True,"mdi:thermometer-check"),
+        "time":EType("sensor","timestamp","PID Time",True,"mdi:clock-outline"),
+        "timedelta":EType("sensor","number","PID Time Delta",True,"mdi:timer-sand"),
+        "setpoint":EType("sensor","number","PID Setpoint",True,"mdi:thermometer-check"),
         "ispoint":EType("sensor","number","",True,"mdi:thermometer"),
         "err":EType("sensor","number","",True,"mdi:alert-circle-outline"),
         "errDelta":EType("sensor","number","",True,"mdi:delta"),
@@ -56,7 +56,7 @@ class Entity_Type():
         "ki":EType("sensor","number","",True,"mdi:alpha-i-box-outline"),
         "kd":EType("sensor","number","",True,"mdi:alpha-d-box-outline"),
         "pid":EType("sensor","number","",True,""),
-        "out":EType("sensor","number","Power_Output",True,"mdi:chart-bell-curve")
+        "out":EType("sensor","number","Power Output",True,"mdi:chart-bell-curve")
     }
 
 
@@ -409,12 +409,9 @@ def get_config():
 def profile_mqtt():
     # Only do this if MQTT is enabled in config
     if config.mqtt_enabled:
-        # Get entity list and create disco messages
         disco_messages={}
-
         entities=Entity_Type().entity_type
         for item in entities:
-# Add general details
             tempObj={}
             if entities[item].isPID:
                 tempObj['stat_t']=str(config.mqtt_kiln_name+"/pidstats/"+item).replace(" ","_")
@@ -430,8 +427,8 @@ def profile_mqtt():
                 tempObj['default_entity_id']=entities[item].devType+"."+config.mqtt_kiln_name+"_"+item
             else:
                 tempObj["name"]=entities[item].friendly_name
-                tempObj['unique_id']=config.mqtt_kiln_name+"_"+entities[item].friendly_name
-                tempObj['default_entity_id']=entities[item].devType+"."+config.mqtt_kiln_name+"_"+entities[item].friendly_name
+                tempObj['unique_id']=config.mqtt_kiln_name+"_"+str(entities[item].friendly_name).replace(" ","_")
+                tempObj['default_entity_id']=entities[item].devType+"."+config.mqtt_kiln_name+"_"+str(entities[item].friendly_name).replace(" ","_")
             tempObj['device']['model']=config.mqtt_kiln_name
             tempObj['device']['manufacturer']=config.mqtt_kiln_name
             tempObj['device']['identifiers']=config.mqtt_kiln_name
@@ -463,6 +460,9 @@ def profile_mqtt():
                     tempObj['state_class']="measurement"
             elif entities[item].devType=="button":
                 tempObj["command_topic"]=config.mqtt_kiln_name+"/"+item+"/set"
+            elif entities[item].devType=="binary_sensor":
+                tempObj["payload_on"]="1"
+                tempObj["payload_off"]="0"
 
             disco_messages[item]=[entities[item].devType, tempObj]
         #publish messages
@@ -479,6 +479,8 @@ def profile_mqtt():
                     pubtopic="homeassistant/select/kiln_controller"+"/"+item+"/config"
                 elif disco_messages[item][0]=="button":
                     pubtopic="homeassistant/button/kiln_controller"+"/"+item+"/config"
+                elif disco_messages[item][0]=="binary_sensor":
+                    pubtopic="homeassistant/binary_sensor/kiln_controller"+"/"+item+"/config"
                 client.publish(pubtopic, json.dumps(disco_messages[item][1]),retain=True)
             client.disconnect()
         except:
