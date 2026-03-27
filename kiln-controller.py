@@ -472,7 +472,7 @@ def profile_mqtt():
             client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "kiln_controller")
             client.username_pw_set(config.mqtt_user, config.mqtt_pass)
             client.connect(config.mqtt_host, config.mqtt_port)
-            client.publish("Kittec_CB40/status","online")
+            client.publish("Kittec_CB40/status","online",retain=True)
             for item in disco_messages:
                 if disco_messages[item][0]=="sensor":
                     pubtopic="homeassistant/sensor/kiln_controller"+"/"+item+"/config"
