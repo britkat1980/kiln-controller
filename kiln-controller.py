@@ -31,6 +31,7 @@ class Entity_Type():
         "cost":EType("sensor","money","",False,"mdi:currency-gbp"),
         "runtime":EType("sensor","string","Program Running Time",False,"mdi:timer-outline"),
         "endtime":EType("sensor","string","Program End Time",False,"mdi:timer-outline"),
+        "progress":EType("sensor","string","Progress",False,"mdi:timer-outline"),
         "temperature":EType("sensor","temperature","",False,"mdi:thermometer"),
         "target":EType("sensor","temperature","",False,"mdi:thermometer-check"),
         "state":EType("sensor","string","",False,"mdi:progress-clock"),
@@ -56,7 +57,7 @@ class Entity_Type():
         "kp":EType("sensor","number","",True,"mdi:alpha-p-box-outline"),
         "ki":EType("sensor","number","",True,"mdi:alpha-i-box-outline"),
         "kd":EType("sensor","number","",True,"mdi:alpha-d-box-outline"),
-        "pid":EType("sensor","number","",True,""),
+        "pid":EType("sensor","number","Power Output",True,""),
         "out":EType("sensor","number","Power Output",True,"mdi:chart-bell-curve")
     }
 
