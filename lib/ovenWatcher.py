@@ -38,7 +38,7 @@ class OvenWatcher(threading.Thread):
         self.start()
 
         self.temppid = {
-            'time': 0,
+            'time': datetime.now().isoformat(),
             'timeDelta': 0,
             'setpoint': 0,
             'ispoint': 0,
