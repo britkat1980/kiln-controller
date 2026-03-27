@@ -38,7 +38,7 @@ class OvenWatcher(threading.Thread):
         self.start()
 
         self.temppid = {
-            'time': datetime.now().isoformat(),
+            'time': time.time(),
             'timeDelta': 0,
             'setpoint': 0,
             'ispoint': 0,
@@ -122,7 +122,7 @@ class OvenWatcher(threading.Thread):
                         timeleft=oven_state["totaltime"]-oven_state["runtime"]
                         endtime=datetime.now()+timedelta(seconds=timeleft)
                         result = self.client.publish(config.mqtt_kiln_name+"/endtime",endtime.strftime("%H:%M:%S"))
-                        progress=timeleft/oven_state["totaltime"]
+                        progress=round(timeleft/oven_state["totaltime"],2)
                         result = self.client.publish(config.mqtt_kiln_name+"/progress",progress)
                     last_push_date=datetime.now()
             except Exception as exc:
