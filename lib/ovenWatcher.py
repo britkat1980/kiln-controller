@@ -118,7 +118,7 @@ class OvenWatcher(threading.Thread):
                                 break
 
                     # Generate finish time here
-                    if oven_state=="RUNNING":
+                    if oven_state["state"]=="RUNNING":
                         timeleft=oven_state["totaltime"]-oven_state["runtime"]
                         endtime=datetime.now()+timedelta(seconds=timeleft)
                         result = self.client.publish(config.mqtt_kiln_name+"/endtime",endtime.strftime("%H:%M:%S"))
