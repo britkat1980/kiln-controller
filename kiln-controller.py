@@ -42,7 +42,7 @@ class Entity_Type():
         "name":EType("sensor","string","",False,""),
         "profiles":EType("select","","",False,""),
         "Restart_Program":EType("button","","",False,""),
-        "Start_Program":EType("button","","",False,""),
+        "Pause_Program":EType("button","","",False,""),
         "Stop_Program":EType("button","","",False,""),
 #PIDSTATS
         "time":EType("sensor","timestamp","PID Time",True,"mdi:clock-outline"),
@@ -460,7 +460,7 @@ def profile_mqtt():
                 if entities[item].sensorClass=="timestamp":
                     tempObj['device_class']="timestamp"
             elif entities[item].devType=="button":
-                tempObj["command_topic"]=config.mqtt_kiln_name+"/"+item+"/set"
+                tempObj["command_topic"]=config.mqtt_kiln_name+"/control/"+item
             elif entities[item].devType=="binary_sensor":
                 tempObj["payload_on"]="1"
                 tempObj["payload_off"]="0"
@@ -489,6 +489,8 @@ def profile_mqtt():
 
 def main():
     profile_mqtt()
+    # Run mqtt client
+    mqtt_client=subprocess.Popen(["/usr/local/bin/python3","/home/pi/kiln-controller/mqtt_client.py"])
     ip = "0.0.0.0"
     port = config.listening_port
     log.info("listening on %s:%d" % (ip, port))
