@@ -1,25 +1,35 @@
-def fluke_from_max(t):
-    """
-    Three-region calibration for MAX31855 → Fluke.
+import requests
+import logging
+import config
+import sys
 
-    - 0–300°C:   identity (matches your low-temp data)
-    - 300–750°C: high-temp segment 1 (already fitted)
-    - >750°C:    high-temp segment 2 (continuity-adjusted)
+logging.basicConfig(level=config.log_level, format=config.log_format)
+logger = logging.getLogger("kiln-controller")
+message=""
+payload={}
+logger.debug("MQTT Message Recieved: "+str(message.topic)+"= "+str(message.payload.decode("utf-8")))
+writecommand={}
+url="http://localhost:8081/api"
+contenttype= "application/json"
+try:
+    command=str(message.topic).split("/")[-1]
+    logger.critical("MQTT topic is: "+command)
+    if command=="Pause_Program":
+        logger.info("Pause command called")
+        payload= '{"cmd":"pause"}'
+    elif command=="Stop_Program":
+        logger.info("stop command called")
+        payload= '{"cmd":"stop"}'
+    elif command=="Resart_Program":
+        logger.info("Restart command called")
+        payload= '{"cmd":"resume"}'
+    elif command== "profiles":
+        profile=message.payload.decode("utf-8")
+        logger.info("Profile Start command called: "+profile)
+        payload= '{"cmd": "run", "profile": "{{ '  + profile +' }}"}'
+    
+    response = requests.post(url, json=payload)
 
-    High-temp behaviour (>564°C) is unchanged from your tuned model.
-    """
-
-    if t <= 300:
-        # Low range: your data is effectively y = x
-        return t
-
-    elif t <= 750:
-        # Mid/high range segment 1 (includes 564–750°C region you tuned)
-        return 1.085 * t - 20.7
-
-    else:
-        # High range segment 2, continuity-adjusted at 750°C
-        return 1.155 * t - 71.5
-
-
-print (fluke_from_max(820))
+except:
+    e = sys.exc_info()
+    logger.error("MQTT.OnMessage Exception: "+str(e))
