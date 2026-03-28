@@ -32,9 +32,12 @@ def on_message(client, userdata, message):
         elif command=="Stop_Program":
             logger.info("stop command called")
             payload= {"cmd":"stop"}
-        elif command=="Restart_Program":
-            logger.info("Restart command called")
+        elif command=="Resume_Program":
+            logger.info("Resume command called")
             payload= {"cmd":"resume"}
+        elif command=="Restart_Congtroller":
+            logger.info("Restart command called")
+            payload= {"cmd":"restart"}    
         elif command== "profiles":
             profile=message.payload.decode("utf-8")
             logger.info("Profile Start command called: "+profile)

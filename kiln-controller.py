@@ -41,9 +41,10 @@ class Entity_Type():
         "catching_up":EType("binary_sensor","","",False,"mdi:run-fast"),
         "name":EType("sensor","string","",False,""),
         "profiles":EType("select","","",False,""),
-        "Restart_Program":EType("button","","",False,""),
+        "Resume_Program":EType("button","","",False,""),
         "Pause_Program":EType("button","","",False,""),
         "Stop_Program":EType("button","","",False,""),
+        "Restart_Controller":EType("button","","",False,""),
 #PIDSTATS
         "time":EType("sensor","timestamp","PID Time",True,"mdi:clock-outline"),
         "timedelta":EType("sensor","number","PID Time Delta",True,"mdi:timer-sand"),
