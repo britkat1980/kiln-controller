@@ -37,7 +37,7 @@ def on_message(client, userdata, message):
             logger.info("Profile Start command called: "+profile)
             payload= '{"cmd": "run", "profile": "{{ '  + profile +' }}"}'
         
-        response = requests.post(url, data=payload)
+        response = requests.post(url, json=payload)
 
     except:
         e = sys.exc_info()
