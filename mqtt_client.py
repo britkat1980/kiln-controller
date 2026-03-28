@@ -3,6 +3,7 @@ import sys
 import logging
 import config
 import requests
+import json
 
 logging.basicConfig(level=config.log_level, format=config.log_format)
 logger = logging.getLogger("kiln-controller")
@@ -20,24 +21,27 @@ def on_message(client, userdata, message):
     writecommand={}
     url="http://localhost:8081/api"
     contenttype= "application/json"
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    
     try:
         command=str(message.topic).split("/")[-1]
         logger.critical("MQTT topic is: "+command)
         if command=="Pause_Program":
             logger.info("Pause command called")
-            payload= '{"cmd":"pause"}'
+            payload= {"cmd":"pause"}
         elif command=="Stop_Program":
             logger.info("stop command called")
-            payload= '{"cmd":"stop"}'
+            payload= {"cmd":"stop"}
         elif command=="Resart_Program":
             logger.info("Restart command called")
-            payload= '{"cmd":"resume"}'
+            payload= {"cmd":"resume"}
         elif command== "profiles":
             profile=message.payload.decode("utf-8")
             logger.info("Profile Start command called: "+profile)
-            payload= '{"cmd": "run", "profile": "{{ '  + profile +' }}"}'
+            payload= {"cmd": "run", "profile": profile }
         
-        response = requests.post(url, json=payload)
+        r = requests.post(url, data=json.dumps(payload), headers=headers)
+        #response = requests.post(url, json=payload)
 
     except:
         e = sys.exc_info()
@@ -72,7 +76,7 @@ if config.mqtt_kiln_name=='':
 else:
     MQTT_Topic=config.mqtt_kiln_name
 
-logger.critical("Connecting to MQTT broker for EVC control- "+str(config.mqtt_host))
+logger.critical("Connecting to MQTT broker for Kiln control- "+str(config.mqtt_host))
 #loop till serial number has been found
 count=0          # 09-July-2023  set start point
 
