@@ -124,6 +124,7 @@ class OvenWatcher(threading.Thread):
                         result = self.client.publish(config.mqtt_kiln_name+"/endtime",endtime.strftime("%H:%M:%S"))
                         progress=round((1-(timeleft/oven_state["totaltime"]))*100,2)
                         result = self.client.publish(config.mqtt_kiln_name+"/progress",progress)
+                    result = self.client.publish(config.mqtt_kiln_name+"/status","online")
                     last_push_date=datetime.now()
             except Exception as exc:
                 log.exception(f"Exception in OvenWatcher iteration: {exc}")
