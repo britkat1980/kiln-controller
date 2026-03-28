@@ -127,7 +127,7 @@ def handle_api():
 
 @app.post('/api')
 def handle_api():
-    log.info("/api is alive")
+    log.info("/api is alive. Message recieved: "+bottle.request.json)
 
 
     # run a kiln schedule
@@ -490,7 +490,8 @@ def profile_mqtt():
 def main():
     profile_mqtt()
     # Run mqtt client
-    mqtt_client=subprocess.Popen(["python3","/home/pi/kiln-controller/mqtt_client.py"])
+    #mqtt_client=subprocess.Popen(["python3","/home/pi/kiln-controller/mqtt_client.py"])
+    mqtt_client=subprocess.Popen(["python3","C:\\Users\\mark\\OneDrive\\Documents\\Code-Dev\\Kiln Controller\\kiln-controller\\mqtt_client.py"])
     ip = "0.0.0.0"
     port = config.listening_port
     log.info("listening on %s:%d" % (ip, port))
