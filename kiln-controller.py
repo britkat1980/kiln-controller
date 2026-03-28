@@ -490,7 +490,7 @@ def profile_mqtt():
 def main():
     profile_mqtt()
     # Run mqtt client
-    mqtt_client=subprocess.Popen(["/usr/local/bin/python3","/home/pi/kiln-controller/mqtt_client.py"])
+    mqtt_client=subprocess.Popen(["python3","/home/pi/kiln-controller/mqtt_client.py"])
     ip = "0.0.0.0"
     port = config.listening_port
     log.info("listening on %s:%d" % (ip, port))
