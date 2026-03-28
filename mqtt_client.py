@@ -32,16 +32,16 @@ def on_message(client, userdata, message):
         elif command=="Stop_Program":
             logger.info("stop command called")
             payload= {"cmd":"stop"}
-        elif command=="Resart_Program":
+        elif command=="Restart_Program":
             logger.info("Restart command called")
             payload= {"cmd":"resume"}
         elif command== "profiles":
             profile=message.payload.decode("utf-8")
             logger.info("Profile Start command called: "+profile)
             payload= {"cmd": "run", "profile": profile }
+        if not payload == "":
+            r = requests.post(url, data=json.dumps(payload), headers=headers)
         
-        r = requests.post(url, data=json.dumps(payload), headers=headers)
-        #response = requests.post(url, json=payload)
 
     except:
         e = sys.exc_info()
