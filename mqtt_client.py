@@ -18,7 +18,7 @@ def on_message(client, userdata, message):
     payload={}
     logger.debug("MQTT Message Recieved: "+str(message.topic)+"= "+str(message.payload.decode("utf-8")))
     writecommand={}
-    url="http://localhost/api"
+    url="http://localhost:8081/api"
     contenttype= "application/json"
     try:
         command=str(message.topic).split("/")[-1]
