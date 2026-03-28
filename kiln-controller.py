@@ -440,13 +440,13 @@ def profile_mqtt():
 
 # Add sensor specific details
             if entities[item].devType=="select":
-                tempObj["command_topic"]=config.mqtt_kiln_name+"/"+item+"/set"
                 tempObj['stat_t']=config.mqtt_kiln_name+"/profile"
                 json_profiles = json.loads(get_profiles())
                 profile_list=[]
                 for profile in json_profiles:
                     profile_list.append(profile['name'])
                 tempObj["options"]=profile_list
+                tempObj["command_topic"]=config.mqtt_kiln_name+"/control/"+item
             elif entities[item].devType=="sensor":
                 if entities[item].sensorClass=="temperature":
                     tempObj['unit_of_meas']="°C"

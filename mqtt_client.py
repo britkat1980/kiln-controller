@@ -2,6 +2,7 @@ import paho.mqtt.client as mqtt
 import sys
 import logging
 import config
+import requests
 
 logging.basicConfig(level=config.log_level, format=config.log_format)
 logger = logging.getLogger("kiln-controller")
@@ -17,15 +18,26 @@ def on_message(client, userdata, message):
     payload={}
     logger.debug("MQTT Message Recieved: "+str(message.topic)+"= "+str(message.payload.decode("utf-8")))
     writecommand={}
+    url="http://localhost/api"
+    contenttype= "application/json"
     try:
         command=str(message.topic).split("/")[-1]
         logger.critical("MQTT topic is: "+command)
-        if command=="pause":
+        if command=="Pause_Program":
             logger.info("Pause command called")
-        elif command=="stop":
+            payload= '{"cmd":"pause"}'
+        elif command=="Stop_Program":
             logger.info("stop command called")
-        elif command=="restart":
+            payload= '{"cmd":"stop"}'
+        elif command=="Resart_Program":
             logger.info("Restart command called")
+            payload= '{"cmd":"resume"}'
+        elif command== "profiles":
+            profile=message.payload.decode("utf-8")
+            logger.info("Profile Start command called: "+profile)
+            payload= '{"cmd": "run", "profile": "{{ '  + profile +' }}"}'
+        
+        response = requests.post(url, data=payload)
 
     except:
         e = sys.exc_info()
