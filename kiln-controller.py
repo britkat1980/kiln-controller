@@ -127,7 +127,7 @@ def handle_api():
 
 @app.post('/api')
 def handle_api():
-    log.info("/api is alive. Message recieved: "+str(bottle.request.json)
+    log.info("/api is alive. Message recieved: "+str(bottle.request.json))
 
 
     # run a kiln schedule
