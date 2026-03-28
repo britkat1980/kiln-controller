@@ -111,6 +111,11 @@ class OvenWatcher(threading.Thread):
                                 result = self.client.publish(config.mqtt_kiln_name+"/"+topic, str(td).split(".")[0])
                             elif isinstance(oven_state[topic],(int, float)):
                                 result = self.client.publish(config.mqtt_kiln_name+"/"+topic, round(oven_state[topic],2))
+                            elif topic=="profile":
+                                if not oven_state.state == "RUNNING":
+                                    result = self.client.publish(config.mqtt_kiln_name+"/"+topic, "IDLE")
+                                else:
+                                    result = self.client.publish(config.mqtt_kiln_name+"/"+topic, oven_state[topic])
                             else:
                                 result = self.client.publish(config.mqtt_kiln_name+"/"+topic, oven_state[topic])
                             if result.rc != mqtt.MQTT_ERR_SUCCESS:

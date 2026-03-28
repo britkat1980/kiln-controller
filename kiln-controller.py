@@ -113,6 +113,7 @@ def handle_api():
     log.info("/api/stats command received")
     profiles=json.loads(get_profiles())
     stats["Profiles"]=[item["name"] for item in profiles if "name" in item]
+    stats["Profiles"].append("IDLE")
     if hasattr(oven,'pid'):
         st["cost"]=oven.cost
         st["catching_up"]=oven.catching_up

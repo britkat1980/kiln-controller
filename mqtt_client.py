@@ -37,7 +37,7 @@ def on_message(client, userdata, message):
             payload= {"cmd":"resume"}
         elif command=="Restart_Congtroller":
             logger.info("Restart command called")
-            payload= {"cmd":"restart"}    
+            payload= {"cmd":"restart"}
         elif command== "profiles":
             profile=message.payload.decode("utf-8")
             logger.info("Profile Start command called: "+profile)
