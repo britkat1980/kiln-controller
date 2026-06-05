@@ -187,7 +187,6 @@ def handle_api():
         if hasattr(oven,'pid'):
             if hasattr(oven.pid,'pidstats'):
                 return json.dumps(oven.pid.pidstats)
-
     return { "success" : True }
 
 def find_profile(wanted):
