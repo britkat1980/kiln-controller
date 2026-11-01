@@ -4,7 +4,7 @@ import time
 import logging
 
 import config
-from temp import to_display, delta_to_c
+from temp import to_display, corrected_temp
 
 log = logging.getLogger(__name__)
 
@@ -217,8 +217,7 @@ class Tuner:
             else:
                 self.oven.output.heat(sleepfor)
 
-            temp = (self.oven.board.temp_sensor.temperature() +
-                    delta_to_c(config.thermocouple_offset))
+            temp = corrected_temp(self.oven.board.temp_sensor.temperature())
             self.csv_data.append((time.time(), to_display(temp)))
 
             # update oven attributes so OvenWatcher broadcasts progress
@@ -264,8 +263,7 @@ class Tuner:
             else:
                 self.oven.output.cool(sleepfor)
 
-            temp = (self.oven.board.temp_sensor.temperature() +
-                    delta_to_c(config.thermocouple_offset))
+            temp = corrected_temp(self.oven.board.temp_sensor.temperature())
             self.csv_data.append((time.time(), to_display(temp)))
 
             self.oven.runtime = time.time() - self.start_time
@@ -395,8 +393,7 @@ class Tuner:
         temperature = None
         try:
             temperature = to_display(
-                self.oven.board.temp_sensor.temperature() +
-                delta_to_c(config.thermocouple_offset))
+                corrected_temp(self.oven.board.temp_sensor.temperature()))
         except Exception:
             pass
 

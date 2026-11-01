@@ -212,6 +212,27 @@ pid_control_window = 10 #degrees
 # cheap thermocouple.  Invest in a better thermocouple.
 thermocouple_offset=0
 
+# thermocouple compensation curve
+# Set tc_compensation = True to correct the raw thermocouple reading with
+# a piecewise polynomial instead of the fixed thermocouple_offset above
+# (the offset is NOT applied when compensation is on). Useful when a
+# thermocouple/board reads progressively wrong as the kiln gets hotter.
+#
+# tc_compensation_curve is a list of (upper_bound, coefficients):
+#   - upper_bound is a raw reading in degrees C (always C, regardless of
+#     temp_scale); the last segment uses None for "everything above"
+#   - coefficients are in ascending powers of the raw reading, so
+#     (-3.2, 1.015) is 1.015*raw - 3.2 and (a, b, c) is a + b*raw + c*raw**2
+# Keep neighbouring segments continuous at each upper_bound or the
+# reading will jump as the kiln passes through it.
+# The default curve below is a MAX31855 calibrated against a Fluke meter.
+tc_compensation = False
+tc_compensation_curve = [
+    (395,  (-3.2, 1.015)),
+    (812,  (-18.1, 1.052)),
+    (None, (213.47, 0.0831, 0.000842)),
+]
+
 # number of samples of temperature to take over each duty cycle.
 # The larger the number, the more load on the board. K type 
 # thermocouples have a precision of about 1/2 degree C. 
@@ -357,3 +378,14 @@ throttle_percent = 20
 #mqtt_pass = None
 #mqtt_topic = "kiln/sensor"
 #mqtt_kiln_name = "my-kiln"
+
+# home assistant - with mqtt_enable on, also publish one topic per value
+# under <mqtt_kiln_name>/... plus home assistant mqtt discovery configs,
+# and accept commands on <mqtt_kiln_name>/control/... (start a profile,
+# pause, resume, stop, restart the controller). The kiln appears in home
+# assistant as a single device named after mqtt_kiln_name. Use a name
+# without spaces or slashes, it is part of every topic.
+#mqtt_ha_discovery = False
+#mqtt_ha_interval = 15           # seconds between state publishes
+#mqtt_ha_prefix = "homeassistant" # home assistant discovery prefix
+#mqtt_ha_currency = "GBP"         # ISO 4217 code for the cost sensor

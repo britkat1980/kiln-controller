@@ -62,3 +62,34 @@ def display_pidstats(pidstats):
         if key in out:
             out[key] = delta_to_display(out[key])
     return out
+
+
+########################################################################
+# thermocouple correction
+#
+# every raw thermocouple reading (celsius, straight off the board) goes
+# through corrected_temp() before the controller uses it. by default
+# that just adds thermocouple_offset. with tc_compensation enabled the
+# reading is mapped through the piecewise polynomial in
+# tc_compensation_curve instead (and the offset is not applied).
+########################################################################
+
+def _poly(coeffs, x):
+    return sum(c * (x ** n) for n, c in enumerate(coeffs))
+
+
+def compensate(raw, curve):
+    '''map a raw celsius reading through a piecewise polynomial curve:
+    a list of (upper_bound, coeffs) where coeffs are in ascending
+    powers of the raw reading. the last segment's bound is None.'''
+    for upper, coeffs in curve:
+        if upper is None or raw <= upper:
+            return _poly(coeffs, raw)
+    return _poly(curve[-1][1], raw)
+
+
+def corrected_temp(raw):
+    '''raw thermocouple celsius -> corrected celsius'''
+    if getattr(config, 'tc_compensation', False):
+        return compensate(raw, config.tc_compensation_curve)
+    return raw + delta_to_c(config.thermocouple_offset)

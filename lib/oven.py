@@ -8,7 +8,7 @@ import os
 import digitalio
 import adafruit_bitbangio as bitbangio
 import statistics
-from temp import to_c, to_display, delta_to_c, delta_to_display, display_pidstats
+from temp import to_c, to_display, delta_to_c, delta_to_display, display_pidstats, corrected_temp
 
 log = logging.getLogger(__name__)
 
@@ -444,7 +444,7 @@ class Oven(threading.Thread):
         if allow_seek:
             if self.state == 'IDLE':
                 if config.seek_start:
-                    temp = self.board.temp_sensor.temperature()  # Defined in a subclass
+                    temp = corrected_temp(self.board.temp_sensor.temperature())
                     runtime += self.get_start_from_temperature(profile, temp)
 
         self.reset()
@@ -517,8 +517,7 @@ class Oven(threading.Thread):
         '''current thermocouple reading in celsius (offset applied), or
         None if it cannot be read right now'''
         try:
-            return (self.board.temp_sensor.temperature() +
-                    delta_to_c(config.thermocouple_offset))
+            return corrected_temp(self.board.temp_sensor.temperature())
         except Exception:
             return None
 
@@ -531,8 +530,7 @@ class Oven(threading.Thread):
         '''shift the whole schedule forward in time by one time_step
         to wait for the kiln to catch up'''
         if config.kiln_must_catch_up == True:
-            temp = self.board.temp_sensor.temperature() + \
-                delta_to_c(config.thermocouple_offset)
+            temp = corrected_temp(self.board.temp_sensor.temperature())
             window = delta_to_c(config.pid_control_window)
             # kiln too cold, wait for it to heat up
             if self.target - temp > window:
@@ -613,8 +611,7 @@ class Oven(threading.Thread):
 
         window = config.emergency_heat_rate_window * 60  # seconds
 
-        temp = self.board.temp_sensor.temperature() + \
-            delta_to_c(config.thermocouple_offset)
+        temp = corrected_temp(self.board.temp_sensor.temperature())
         self.emergency_heat_rate_temps.append((self.runtime, temp))
 
         # keep only the samples inside the rolling window
@@ -765,8 +762,10 @@ class Oven(threading.Thread):
 
     def get_state(self):
         temp = 0
+        raw = 0
         try:
-            temp = self.board.temp_sensor.temperature() + delta_to_c(config.thermocouple_offset)
+            raw = self.board.temp_sensor.temperature()
+            temp = corrected_temp(raw)
         except AttributeError:
             # this happens at start-up with a simulated oven
             temp = 0
@@ -785,6 +784,7 @@ class Oven(threading.Thread):
             'cost': self.cost,
             'runtime': self.runtime,
             'temperature': to_display(temp),
+            'temperature_raw': to_display(raw),
             'target': to_display(self.target),
             'state': self.state,
             'heat': self.heat,
@@ -1228,8 +1228,7 @@ class SimulatedOven(Oven):
     def heat_then_cool(self):
         now_simulator = datetime.datetime.fromtimestamp(self.start_time + self.runtime)
         pid = self.pid.compute(self.target,
-                               self.board.temp_sensor.temperature() +
-                               delta_to_c(config.thermocouple_offset), now_simulator)
+                               corrected_temp(self.board.temp_sensor.temperature()), now_simulator)
 
         heat_on = float(self.time_step * pid)
         heat_off = float(self.time_step * (1 - pid))
@@ -1292,8 +1291,7 @@ class RealOven(Oven):
 
     def heat_then_cool(self):
         pid = self.pid.compute(self.target,
-                               self.board.temp_sensor.temperature() +
-                               delta_to_c(config.thermocouple_offset), datetime.datetime.now())
+                               corrected_temp(self.board.temp_sensor.temperature()), datetime.datetime.now())
 
         heat_on = float(self.time_step * pid)
         heat_off = float(self.time_step * (1 - pid))

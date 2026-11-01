@@ -17,7 +17,7 @@ except ImportError:
         exit(1)
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib/'))
-from temp import to_c, to_display, delta_to_c
+from temp import to_c, to_display, corrected_temp
 
 
 ########################################################################
@@ -129,8 +129,7 @@ def recordprofile(csvfile, targettemp):
                 oven.heat_then_cool()
             else:
                 oven.output.heat(sleepfor)
-            temp = oven.board.temp_sensor.temperature() + \
-                delta_to_c(config.thermocouple_offset)
+            temp = corrected_temp(oven.board.temp_sensor.temperature())
 
             print("stage = %s, actual = %.2f, target = %.2f" % (stage,to_display(temp),to_display(targettemp)))
             csvout.writerow([time.time(), to_display(temp)])
@@ -145,8 +144,7 @@ def recordprofile(csvfile, targettemp):
                 oven.heat_then_cool()
             else:
                 oven.output.cool(sleepfor)
-            temp = oven.board.temp_sensor.temperature() + \
-                delta_to_c(config.thermocouple_offset)
+            temp = corrected_temp(oven.board.temp_sensor.temperature())
 
             print("stage = %s, actual = %.2f, target = %.2f" % (stage,to_display(temp),to_display(targettemp)))
             csvout.writerow([time.time(), to_display(temp)])
