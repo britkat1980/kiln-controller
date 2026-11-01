@@ -98,6 +98,8 @@ card:
     - entity: sensor.kittec_cb40_temperature
       name: Actual
       stroke_width: 2
+      # stop at now rather than flatlining to the end of the schedule
+      extend_to: now
     - entity: sensor.kittec_cb40_schedule
       name: Schedule
       curve: straight
