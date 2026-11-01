@@ -112,6 +112,40 @@ thermocouple_type = adafruit_max31856.ThermocoupleType.K
 #   ThermocoupleType.S
 #   ThermocoupleType.T
 
+#######################################
+### Modbus thermocouple input modules
+#######################################
+# Instead of a MAX318xx breakout, read the temperature from an industrial
+# thermocouple input module over Modbus RTU (RS-485), e.g. a Seneca Z-4TC
+# on a USB RS-485 adapter. The module does the thermocouple conversion
+# and cold junction compensation, and these modules are reported to stay
+# stable above 900C where MAX31856 boards can struggle.
+#
+# Set modbus = 1 to use it (it takes priority over max31855/max31856).
+# Configure the module itself for degrees C and the thermocouple type.
+# The register layout is in the module's manual.
+modbus = 0
+modbus_port_name = "/dev/ttyUSB0"
+modbus_slave_address = 1
+modbus_baudrate = 38400
+modbus_parity = "N"           # "N", "E" or "O"
+modbus_stopbits = 1
+modbus_timeout = 0.5          # seconds to wait for a reply
+# register holding the temperature, as the 0-based address sent on the
+# wire. Manuals often number registers from 1 or as 4xxxx/3xxxx, so a
+# manual's "40013" or "register 13" is usually 12 here.
+modbus_registernumber = 12
+modbus_functioncode = 3       # 3 = holding registers, 4 = input registers
+modbus_format = "int"         # "int": one 16 bit register, "float": two registers
+modbus_decimal = 1            # int only: 1 means the register holds tenths
+modbus_signed = True          # int only
+modbus_byteorder = 0          # float only: minimalmodbus BYTEORDER_* value
+# raw register values the module uses to flag a fault (open thermocouple,
+# out of range). They raise a "not connected" thermocouple error instead
+# of being used as a temperature. Check your module's manual,
+# e.g. [32767, -32768]
+modbus_fault_values = []
+
 ########################################################################
 #
 # If your kiln is above the starting temperature of the schedule when you 

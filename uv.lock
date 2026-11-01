@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 
 [[package]]
@@ -577,6 +577,7 @@ dependencies = [
     { name = "gevent" },
     { name = "gevent-websocket" },
     { name = "greenlet" },
+    { name = "minimalmodbus" },
     { name = "paho-mqtt" },
     { name = "requests" },
     { name = "rpi-lgpio" },
@@ -601,6 +602,7 @@ requires-dist = [
     { name = "gevent", specifier = "==26.9.0" },
     { name = "gevent-websocket", specifier = "==0.10.1" },
     { name = "greenlet", specifier = "==3.5.6" },
+    { name = "minimalmodbus", specifier = "==2.1.1" },
     { name = "paho-mqtt", specifier = "==2.1.0" },
     { name = "requests", specifier = "==2.34.2" },
     { name = "rpi-lgpio", specifier = "==0.6" },
@@ -628,6 +630,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fe/73/e56c9afb845df53492d42bdea01df9895272bccfdd5128f34719c3a07990/lgpio-0.2.2.0-cp312-cp312-linux_armv7l.whl", hash = "sha256:6c65ac42e878764d04a71ed12fe6d46089b36e9e8127722bf29bb2e4bc91de22", size = 383956, upload-time = "2024-03-29T22:00:47.315Z" },
     { url = "https://files.pythonhosted.org/packages/3b/1c/becd00f66d2c65feed9a668ff9d91732394cb6baba7bec505d55de0e30c9/lgpio-0.2.2.0-cp312-cp312-manylinux_2_34_aarch64.whl", hash = "sha256:d907db79292c721c605af08187385ddb3b7af09907e1ffca56cf0cd6558ace0a", size = 366058, upload-time = "2024-04-01T22:49:47.615Z" },
     { url = "https://files.pythonhosted.org/packages/4c/7a/e3b4e5225c9792c4092b2cc07504746acbe62d0a8e4cb023bdf65f6430cf/lgpio-0.2.2.0-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:2aadff092f642fcdada8457c158f87259dfda3a89ec19bae0b99ff22b34aac4b", size = 372103, upload-time = "2024-04-13T14:08:16.351Z" },
+]
+
+[[package]]
+name = "minimalmodbus"
+version = "2.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyserial" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/37/fc/8a58f7bcdece751f16a4a9aac780acd1288aa8ac6adbffdd764c88fb71c6/minimalmodbus-2.1.1.tar.gz", hash = "sha256:c3f5a56e107d537e4bb420f7e735841ab2939c8ca6fb528f5fe4124571315b64", size = 102512, upload-time = "2023-07-17T19:51:19.184Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/7b/b73ba3ec36687341e37a1c9df0ebec3e3b2b0f8d6ae14e109ec5076ebe58/minimalmodbus-2.1.1-py3-none-any.whl", hash = "sha256:75c677e2f3ea901b762f8b2ab7cf8ad84de915bbea275d66e30b724e23887b1a", size = 32335, upload-time = "2023-07-17T19:51:16.707Z" },
 ]
 
 [[package]]

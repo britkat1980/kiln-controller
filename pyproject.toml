@@ -26,6 +26,8 @@ dependencies = [
     "adafruit-circuitpython-max31856 ==0.12.7",
     # mqtt telemetry (optional - only used when mqtt_enable is set in config.py)
     "paho-mqtt ==2.1.0",
+    # modbus rtu thermocouple input modules (only used when modbus = 1 in config.py)
+    "minimalmodbus ==2.1.1",
     # untested - for PT100 platinum thermocouples
     # "adafruit-circuitpython-max31865 ==2.2.27"
     # untested - for mcp9600 and mcp9601

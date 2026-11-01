@@ -90,6 +90,10 @@ class RealBoard(Board):
         self.name = board.board_id
 
     def choose_tempsensor(self):
+        # modbus first: it is an explicit opt-in, and leaving the default
+        # max31855 = 1 in place alongside it must not silently win
+        if getattr(config, 'modbus', 0):
+            return Modbus()
         if config.max31855:
             return Max31855()
         if config.max31856:
@@ -126,14 +130,19 @@ class TempSensorReal(TempSensor):
     '''real temperature sensor that takes many measurements
        during the time_step
        inputs
-           config.temperature_average_samples 
+           config.temperature_average_samples
     '''
+    # sensors on the SPI bus (the MAX318xx boards). others, like modbus
+    # modules on a serial port, set this False.
+    uses_spi = True
+
     def __init__(self):
         TempSensor.__init__(self)
         self.sleeptime = self.time_step / float(config.temperature_average_samples)
-        self.temptracker = TempTracker() 
-        self.spi_setup()
-        self.cs = digitalio.DigitalInOut(config.spi_cs)
+        self.temptracker = TempTracker()
+        if self.uses_spi:
+            self.spi_setup()
+            self.cs = digitalio.DigitalInOut(config.spi_cs)
 
     def spi_setup(self):
         if(hasattr(config,'spi_sclk') and
@@ -334,6 +343,72 @@ class Max31856_Error(ThermocoupleError):
             "open_tc"  : "not connected"
             }
         super().__init__(message)
+
+class Modbus_Error(ThermocoupleError):
+    '''kind is "comms" (no or bad reply from the module) or "fault" (the
+    module reported a fault value, usually an open thermocouple)'''
+    def __init__(self, message, kind='comms'):
+        self.orig_message = message
+        self.kind = kind
+        super().__init__(message)
+
+    def map_message(self):
+        # comms errors map to "unknown" so ignore_tc_unknown_error and
+        # the too-many-errors abort apply to them as to any other board
+        self.message = {'fault': 'not connected'}.get(self.kind, 'unknown')
+
+
+class Modbus(TempSensorReal):
+    '''thermocouple input module read over modbus rtu (rs-485), e.g. a
+    Seneca Z-4TC on a usb rs-485 adapter. the module does the
+    thermocouple conversion and cold junction compensation itself, so
+    reads are a plain register read. see the modbus section of config.py.
+    '''
+    uses_spi = False
+
+    def __init__(self):
+        TempSensorReal.__init__(self)
+        import minimalmodbus
+        port = config.modbus_port_name
+        slave = config.modbus_slave_address
+        log.info("thermocouple modbus: %s slave %s register %s" % (
+            port, slave, config.modbus_registernumber))
+        self.register = config.modbus_registernumber
+        self.decimals = getattr(config, 'modbus_decimal', 0)
+        self.functioncode = getattr(config, 'modbus_functioncode', 3)
+        self.signed = getattr(config, 'modbus_signed', True)
+        self.format = getattr(config, 'modbus_format', 'int')
+        self.byteorder = getattr(config, 'modbus_byteorder', 0)
+        self.fault_values = set(getattr(config, 'modbus_fault_values', []))
+
+        self.instrument = minimalmodbus.Instrument(port, slave)
+        serial = self.instrument.serial
+        serial.baudrate = config.modbus_baudrate
+        serial.parity = getattr(config, 'modbus_parity', 'N')
+        serial.stopbits = getattr(config, 'modbus_stopbits', 1)
+        serial.timeout = getattr(config, 'modbus_timeout', 0.5)
+        self.instrument.clear_buffers_before_each_transaction = True
+
+    def raw_temp(self):
+        try:
+            if self.format == 'float':
+                value = self.instrument.read_float(
+                    self.register, functioncode=self.functioncode,
+                    byteorder=self.byteorder)
+                raw = value
+            else:
+                raw = self.instrument.read_register(
+                    self.register, 0, functioncode=self.functioncode,
+                    signed=self.signed)
+                value = raw / (10 ** self.decimals)
+        except (OSError, ValueError) as e:
+            # minimalmodbus.ModbusException and serial.SerialException
+            # are both OSErrors; ValueError covers malformed replies
+            raise Modbus_Error("%s: %s" % (type(e).__name__, e)) from e
+        if raw in self.fault_values:
+            raise Modbus_Error("module reported fault value %s" % raw, kind='fault')
+        return value
+
 
 class Max31856(TempSensorReal):
     '''each subclass expected to handle errors and get temperature'''
