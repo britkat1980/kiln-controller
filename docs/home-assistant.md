@@ -73,14 +73,30 @@ piecewise polynomial instead, and the offset is not applied:
 ```python
 tc_compensation = True
 tc_compensation_curve = [
-    (395,  (-3.2, 1.015)),               # raw <= 395:  1.015*raw - 3.2
-    (844.36, (-18.1, 1.052)),            # raw <= 844.36: 1.052*raw - 18.1
-    (None, (199.7, 0.0831, 0.000842)),   # above:         199.7 + 0.0831*raw + 0.000842*raw^2
+    (409.5, (0, 1)),                          # raw <= 409.5: unchanged
+    (None,  (12.193, 0.893126, 0.000188281)), # above: 12.193 + 0.893126*raw + 0.000188281*raw^2
 ]
 ```
 
 Each entry is `(upper_bound, coefficients)` with coefficients in ascending
 powers of the raw reading. The last segment's bound is `None`.
+
+### Fitting a curve
+
+Record pairs of (raw reading, reference meter reading) across the firing
+range. Fit a quadratic by least squares to the points where the readings
+diverge, and use the plain reading (`(0, 1)`) below the point where the
+fit crosses it, so the two segments meet with no step. The default above
+came from 12 readings from 122 to 1031°C and matches every one to within 1.8°C:
+
+| raw | 122 | 173 | 295 | 564 | 604 | 650 | 700 | 750 | 820 | 888 | 900 | 950 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| meter | 122 | 173 | 295 | 576 | 619 | 673 | 731 | 788 | 870 | 952 | 970 | 1031 |
+
+Avoid high-order polynomials and steep top segments. Anything above your
+highest reference reading is extrapolation, and a curve that steepens
+there will over-read and end firings early. Check the top end with
+witness cones.
 
 The corrected value is used everywhere: PID control, the emergency
 shutoffs, alerts, seek-start, the auto-tuner and the display.

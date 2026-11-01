@@ -225,12 +225,13 @@ thermocouple_offset=0
 #     (-3.2, 1.015) is 1.015*raw - 3.2 and (a, b, c) is a + b*raw + c*raw**2
 # Keep neighbouring segments continuous at each upper_bound or the
 # reading will jump as the kiln passes through it.
-# The default curve below is a MAX31855 calibrated against a Fluke meter.
+# The default curve below is a MAX31855 calibrated against a Fluke meter
+# (12 readings, 122-1031C, every one within 1.8C). Above 950C raw it is
+# extrapolated, so check the top end with witness cones.
 tc_compensation = False
 tc_compensation_curve = [
-    (395,  (-3.2, 1.015)),
-    (844.36, (-18.1, 1.052)),
-    (None, (199.7, 0.0831, 0.000842)),
+    (409.5, (0, 1)),                          # matches the meter up to here
+    (None,  (12.193, 0.893126, 0.000188281)), # least-squares fit, 564-950C raw
 ]
 
 # number of samples of temperature to take over each duty cycle.
