@@ -20,6 +20,7 @@ class MqttOut:
         # from the live state stream
         self.topic = topic or getattr(config, "mqtt_topic", "kiln/sensor")
         self.kiln_name = getattr(config, "mqtt_kiln_name", None)
+        self._last_rc = 0
         if self.enabled:
             self._connect(client_cls)
 
@@ -43,7 +44,9 @@ class MqttOut:
         client = client_cls()
         if user is not None:
             client.username_pw_set(user, password)
-        client.connect(host, port)
+        # connect_async + loop_start keeps retrying in the background, so a
+        # broker or network that is not up yet at boot is picked up later
+        client.connect_async(host, port)
         return client
 
     def publish(self, state):
@@ -54,7 +57,11 @@ class MqttOut:
             payload["name"] = self.kiln_name
         try:
             result = self.client.publish(self.topic, json.dumps(payload))
-            if getattr(result, "rc", 0):
-                log.error("mqtt publish returned rc=%s", result.rc)
+            rc = getattr(result, "rc", 0)
+            # state is published every second: log a failure once, not
+            # every second while the broker is down
+            if rc and rc != self._last_rc:
+                log.error("mqtt publish returned rc=%s", rc)
+            self._last_rc = rc
         except Exception:
             log.exception("mqtt publish failed")

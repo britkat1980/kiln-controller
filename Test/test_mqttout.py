@@ -21,7 +21,7 @@ class FakeClient:
     def username_pw_set(self, user, password):
         self.calls.append(('userpass', user, password))
 
-    def connect(self, host, port):
+    def connect_async(self, host, port):
         if self.connect_error:
             raise self.connect_error
         self.calls.append(('connect', host, port))
@@ -114,6 +114,34 @@ def test_publish_error_rc_logged(mqtt_config, caplog):
     out = mqttout.MqttOut(client_cls=lambda: client)
     out.publish({'state': 'IDLE'})
     assert any('mqtt publish returned rc=4' in r.message for r in caplog.records)
+
+
+def test_publish_error_logged_once_until_recovered(mqtt_config, caplog):
+    mqtt_config(enable=True, mqtt_topic='kiln/sensor')
+    client = FakeClient(rc=4)
+    out = mqttout.MqttOut(client_cls=lambda: client)
+
+    def logged():
+        return sum('mqtt publish returned' in r.message for r in caplog.records)
+
+    for _ in range(5):
+        out.publish({'state': 'IDLE'})
+    assert logged() == 1
+    client.rc = 0
+    out.publish({'state': 'IDLE'})
+    client.rc = 4
+    out.publish({'state': 'IDLE'})
+    assert logged() == 2
+
+
+def test_broker_unreachable_at_start_keeps_client(mqtt_config):
+    '''connect_async never touches the network, so the client survives a
+    boot where wifi is not up yet and paho connects once it is'''
+    mqtt_config(enable=True, mqtt_host='broker.home')
+    client = FakeClient()
+    out = mqttout.MqttOut(client_cls=lambda: client)
+    assert out.client is client
+    assert client.loop_started is True
 
 
 def test_publish_exception_caught(mqtt_config, caplog):
