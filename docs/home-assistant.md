@@ -74,8 +74,8 @@ piecewise polynomial instead, and the offset is not applied:
 tc_compensation = True
 tc_compensation_curve = [
     (395,  (-3.2, 1.015)),               # raw <= 395:  1.015*raw - 3.2
-    (812,  (-18.1, 1.052)),              # raw <= 812:  1.052*raw - 18.1
-    (None, (213.47, 0.0831, 0.000842)),  # above:       213.47 + 0.0831*raw + 0.000842*raw^2
+    (844.36, (-18.1, 1.052)),            # raw <= 844.36: 1.052*raw - 18.1
+    (None, (199.7, 0.0831, 0.000842)),   # above:         199.7 + 0.0831*raw + 0.000842*raw^2
 ]
 ```
 

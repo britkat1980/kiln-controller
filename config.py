@@ -229,8 +229,8 @@ thermocouple_offset=0
 tc_compensation = False
 tc_compensation_curve = [
     (395,  (-3.2, 1.015)),
-    (812,  (-18.1, 1.052)),
-    (None, (213.47, 0.0831, 0.000842)),
+    (844.36, (-18.1, 1.052)),
+    (None, (199.7, 0.0831, 0.000842)),
 ]
 
 # number of samples of temperature to take over each duty cycle.
