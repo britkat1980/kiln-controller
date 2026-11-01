@@ -37,7 +37,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
 profile_path = config.kiln_profiles_directory
 
-from temp import f_to_c, c_to_f, to_c
+from temp import f_to_c, c_to_f, to_c, to_display
 from oven import SimulatedOven, RealOven, Profile
 from ovenWatcher import OvenWatcher
 from scheduler import Scheduler
@@ -1397,13 +1397,21 @@ def remote_command(command, argument=None):
 def profile_names():
     return [p.get('name') for p in json.loads(get_profiles()) if p.get('name')]
 
+def running_schedule():
+    '''the running profile as [(seconds, temperature)] in the display scale'''
+    profile = oven.profile
+    if profile is None:
+        return None
+    return [(t, to_display(temp)) for t, temp in profile.data]
+
 def start_home_assistant():
     '''publish state and discovery to home assistant over mqtt when
     mqtt_enable and mqtt_ha_discovery are both on'''
     if not ha_enabled():
         return None
     try:
-        ha = HomeAssistant(remote_command, profile_names)
+        ha = HomeAssistant(remote_command, profile_names,
+                           schedule=running_schedule)
         ovenWatcher.add_publisher(ha)
         log.info("home assistant mqtt integration started")
         return ha

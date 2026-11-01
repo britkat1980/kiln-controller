@@ -37,6 +37,7 @@ named after `mqtt_kiln_name`.
 | heat, catching up (binary sensors, `1`/`0`) | `<kiln>/heat`, `<kiln>/catching_up` |
 | running time, duration (`H:MM:SS`) | `<kiln>/runtime`, `<kiln>/totaltime` |
 | end time (`HH:MM:SS`, `-` when idle), progress (%) | `<kiln>/endtime`, `<kiln>/progress` |
+| schedule (running profile, `None` when idle; attributes below) | `<kiln>/schedule`, `<kiln>/schedule/attributes` |
 | PID stats | `<kiln>/pidstats/<key>` |
 | availability (`online` / `offline`, last will) | `<kiln>/status` |
 
@@ -45,6 +46,67 @@ the oven state or running profile changes. Everything is retained so
 Home Assistant has values immediately after it restarts. Discovery is
 re-sent when Home Assistant announces itself on `<prefix>/status`, and when
 the list of profiles changes.
+
+## Firing graph
+
+The schedule sensor's attributes hold the running profile as wall-clock
+points, so a dashboard can draw the whole schedule ahead of time, like the
+controller's own graph:
+
+```json
+{"start": 1767268800000, "end": 1767308400000,
+ "points": [[1767268800000, 20.0], [1767272400000, 600.0], ...]}
+```
+
+Times are epoch milliseconds and temperatures are in the display scale.
+The schedule is laid from the run's start (now minus running time), so it
+moves right when the kiln is catching up or paused, as it does in the
+controller. When nothing is running, `points` is empty.
+
+This card plots actual temperature against the schedule, with the time axis
+fitted to the firing. It needs
+[apexcharts-card](https://github.com/RomRider/apexcharts-card) and
+[config-template-card](https://github.com/iantrich/config-template-card)
+from HACS. Change `kittec_cb40` to your `mqtt_kiln_name`.
+
+```yaml
+type: custom:config-template-card
+entities:
+  - sensor.kittec_cb40_schedule
+  - sensor.kittec_cb40_temperature
+variables:
+  START: states['sensor.kittec_cb40_schedule'].attributes.start
+  END: states['sensor.kittec_cb40_schedule'].attributes.end
+card:
+  type: custom:apexcharts-card
+  header:
+    show: true
+    title: Firing
+    show_states: true
+  # while firing: the whole schedule plus 15 minutes either side.
+  # otherwise: the last 12 hours
+  graph_span: "${START ? Math.ceil((END - START) / 60000) + 30 + 'min' : '12h'}"
+  span:
+    end: minute
+    offset: "${START ? '+' + Math.max(1, Math.round((END - Date.now()) / 60000) + 15) + 'min' : '+1min'}"
+  now:
+    show: true
+  yaxis:
+    - min: 0
+      decimals: 0
+  series:
+    - entity: sensor.kittec_cb40_temperature
+      name: Actual
+      stroke_width: 2
+    - entity: sensor.kittec_cb40_schedule
+      name: Schedule
+      curve: straight
+      stroke_width: 2
+      show:
+        in_header: false
+      data_generator: |
+        return entity.attributes.points || [];
+```
 
 ## Controls
 

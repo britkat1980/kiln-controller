@@ -48,6 +48,9 @@ ENTITIES = {
     'totaltime': ('sensor', '', 'Program Duration', False, 'mdi:timer-outline'),
     'catching_up': ('binary_sensor', '', '', False, 'mdi:run-fast'),
     'name': ('sensor', '', '', False, ''),
+    # state is the running profile, attributes the whole schedule (see
+    # schedule_attributes) so a dashboard can draw it ahead of time
+    'schedule': ('sensor', '', 'Schedule', False, 'mdi:chart-line'),
     'profiles': ('select', '', '', False, ''),
     'Resume_Program': ('button', '', '', False, ''),
     'Pause_Program': ('button', '', '', False, ''),
@@ -90,11 +93,15 @@ def format_duration(seconds):
 class HomeAssistant(object):
     '''on_command(command, argument) is called on the mqtt network
     thread for each valid command and returns (ok, message).
-    profile_names() returns the current list of profile names.'''
+    profile_names() returns the current list of profile names.
+    schedule() returns the running profile's [(seconds, temperature)]
+    in the display scale, or None when nothing is running.'''
 
-    def __init__(self, on_command, profile_names, client=None, clock=time.time):
+    def __init__(self, on_command, profile_names, client=None, clock=time.time,
+                 schedule=None):
         self.on_command = on_command
         self.profile_names = profile_names
+        self.schedule = schedule or (lambda: None)
         self.clock = clock
         self.base = str(getattr(config, 'mqtt_kiln_name', None) or 'kiln').replace(' ', '_')
         self.prefix = getattr(config, 'mqtt_ha_prefix', 'homeassistant')
@@ -218,6 +225,8 @@ class HomeAssistant(object):
                 cfg['command_topic'] = self.topic('control/' + key)
             elif component == 'button':
                 cfg['command_topic'] = self.topic('control/' + key)
+            elif key == 'schedule':
+                cfg['json_attr_t'] = self.topic('schedule/attributes')
             elif component == 'binary_sensor':
                 cfg['payload_on'] = '1'
                 cfg['payload_off'] = '0'
@@ -272,6 +281,10 @@ class HomeAssistant(object):
             msgs.append(('endtime', '-'))
             msgs.append(('progress', 0))
 
+        msgs.append(('schedule', state.get('profile') if running else NO_PROFILE))
+        msgs.append(('schedule/attributes',
+                     json.dumps(self.schedule_attributes(state, now))))
+
         for key, value in (state.get('pidstats') or {}).items():
             key = PIDSTAT_TOPICS.get(key, key)
             if key not in ENTITIES:
@@ -282,6 +295,27 @@ class HomeAssistant(object):
                 value = round(value, 2)
             msgs.append(('pidstats/' + key, value))
         return msgs
+
+    def schedule_attributes(self, state, now):
+        '''the running schedule as wall-clock points: {"start", "end",
+        "points": [[epoch ms, temperature], ...]}. the schedule is laid
+        from now - runtime, so it moves right when the kiln is catching
+        up or paused, as on the controller's own graph.'''
+        empty = {'start': None, 'end': None, 'points': []}
+        if state.get('state') not in ('RUNNING', 'PAUSED'):
+            return empty
+        try:
+            points = self.schedule()
+        except Exception:
+            log.exception("home assistant schedule lookup failed")
+            return empty
+        if not points:
+            return empty
+        # to the minute, so the attributes (and the recorder) only change
+        # when the schedule really moves, not with timing jitter
+        start = int(round((now.timestamp() - (state.get('runtime') or 0)) / 60) * 60)
+        out = [[(start + int(t)) * 1000, round(temp, 1)] for t, temp in points]
+        return {'start': out[0][0], 'end': out[-1][0], 'points': out}
 
     def publish(self, state):
         '''called by the oven watcher every duty cycle. publishes every

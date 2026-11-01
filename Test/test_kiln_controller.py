@@ -2353,3 +2353,14 @@ def test_api_profiles_remote_route(monkeypatch, tmp_path):
     resp = json.loads(b''.join(controller.app(env, start_response)))
     assert out['status'] == '200 OK'
     assert resp['success'] is True
+
+
+def test_running_schedule_in_display_scale(monkeypatch):
+    profile = types.SimpleNamespace(data=[[0, 20.0], [3600, 1000.0]])
+    monkeypatch.setattr(controller.oven, 'profile', profile, raising=False)
+    monkeypatch.setattr(controller.config, 'temp_scale', 'c')
+    assert controller.running_schedule() == [(0, 20.0), (3600, 1000.0)]
+    monkeypatch.setattr(controller.config, 'temp_scale', 'f')
+    assert controller.running_schedule() == [(0, 68.0), (3600, 1832.0)]
+    monkeypatch.setattr(controller.oven, 'profile', None)
+    assert controller.running_schedule() is None

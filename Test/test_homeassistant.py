@@ -240,3 +240,47 @@ def test_no_client_is_harmless(ha):
     ha.client = None
     ha.publish(state())
     ha.publish_discovery()
+
+
+def test_schedule_discovery_has_attributes_topic(ha):
+    configs = dict(ha.discovery_configs())
+    sched = json.loads(configs['homeassistant/sensor/kiln_controller/schedule/config'])
+    assert sched['unique_id'] == 'Kittec_CB40_Schedule'
+    assert sched['stat_t'] == 'Kittec_CB40/schedule'
+    assert sched['json_attr_t'] == 'Kittec_CB40/schedule/attributes'
+
+
+def test_schedule_laid_from_run_start(ha):
+    ha.schedule = lambda: [(0, 20.0), (3600, 600.04), (7200, 1222.0)]
+    now = datetime.datetime(2026, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    msgs = dict(ha.state_messages(state(runtime=1800), now=now))
+    assert msgs['schedule'] == 'bisque'
+    attrs = json.loads(msgs['schedule/attributes'])
+    start = int(now.timestamp() - 1800) * 1000
+    assert attrs['start'] == start
+    assert attrs['end'] == start + 7200 * 1000
+    assert attrs['points'] == [[start, 20.0], [start + 3600000, 600.0],
+                               [start + 7200000, 1222.0]]
+
+
+def test_schedule_start_ignores_timing_jitter(ha):
+    ha.schedule = lambda: [(0, 20.0), (60, 30.0)]
+    now = datetime.datetime(2026, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    a = ha.schedule_attributes(state(runtime=1800.0), now)
+    b = ha.schedule_attributes(state(runtime=1797.3), now)
+    assert a == b
+
+
+def test_schedule_empty_when_idle(ha):
+    ha.schedule = lambda: [(0, 20.0), (60, 30.0)]
+    msgs = dict(ha.state_messages(state(state='IDLE', profile=None)))
+    assert msgs['schedule'] == 'None'
+    assert json.loads(msgs['schedule/attributes']) == {'start': None, 'end': None, 'points': []}
+
+
+def test_schedule_lookup_error_is_harmless(ha):
+    def broken():
+        raise RuntimeError('no oven')
+    ha.schedule = broken
+    msgs = dict(ha.state_messages(state()))
+    assert json.loads(msgs['schedule/attributes'])['points'] == []
