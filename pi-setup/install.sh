@@ -43,13 +43,10 @@ done
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y git python3-venv python3-dev
-
-# lgpio only ships wheels for python 3.11/3.12; newer pythons build it
-# from source, which needs swig and the lgpio headers
-if python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 13) else 1)'; then
-    apt-get install -y swig liblgpio-dev
-fi
+# lgpio has no wheel for every python/arch combination (32-bit os,
+# python 3.13+); pip then builds it from source, which needs swig and
+# the lgpio headers
+apt-get install -y git python3-venv python3-dev swig liblgpio-dev
 
 if [ -d "$REPO_DIR/.git" ]; then
     sudo -u "$USER_NAME" git -C "$REPO_DIR" pull --ff-only || true
