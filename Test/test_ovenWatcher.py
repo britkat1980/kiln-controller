@@ -305,6 +305,36 @@ def test_run_loop_skips_mqtt_when_disabled(monkeypatch):
     assert len(sock.sent) == 2
 
 
+def test_run_loop_feeds_publishers_and_survives_failures(monkeypatch):
+    watcher = make_watcher(state="RUNNING")
+    good = FakeMqttOut()
+
+    class Broken:
+        def publish(self, state):
+            raise RuntimeError("broker gone")
+
+    watcher.publishers = []
+    watcher.add_publisher(Broken())
+    watcher.add_publisher(good)
+    sock = FakeSocket()
+    watcher.observers.append(sock)
+
+    sleeps = [0]
+
+    def fake_sleep(secs):
+        sleeps[0] += 1
+        if sleeps[0] >= 2:
+            raise StopIteration
+
+    monkeypatch.setattr(ovenWatcher.time, 'sleep', fake_sleep)
+
+    with pytest.raises(StopIteration):
+        watcher.run()
+
+    assert len(good.published) == 2
+    assert len(sock.sent) == 2
+
+
 def test_watcher_init_creates_mqtt_only_when_enabled(monkeypatch):
     monkeypatch.setattr(ovenWatcher.OvenWatcher, 'start', lambda self: None)
     monkeypatch.setattr(ovenWatcher, 'mqtt_enabled', lambda: False)

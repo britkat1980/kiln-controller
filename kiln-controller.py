@@ -45,6 +45,7 @@ from tuner import Tuner, DEFAULT_METHOD
 from alerts import (AlertStore, AlertManager, LogSink, MqttSink,
                      WebhookSink, ALERTS, validate_delivery)
 from mqttout import enabled as mqtt_enabled
+from homeassistant import HomeAssistant, enabled as ha_enabled
 from firing_db import FiringDb
 from version import __version__
 
@@ -133,23 +134,25 @@ def handle_api():
 
     if bottle.request.json['cmd'] == 'pause':
         log.info("api pause command received")
-        # pausing from any other state would leave the oven thread in a
-        # PAUSED state with no profile, which it cannot run
-        if oven.state != 'RUNNING':
-            return { "success" : False,
-                     "error" : "cannot pause, oven state is %s" % (oven.state) }
-        oven.state = 'PAUSED'
+        ok, error = pause_run()
+        if not ok:
+            return { "success" : False, "error" : error }
 
     if bottle.request.json['cmd'] == 'resume':
         log.info("api resume command received")
-        if oven.state != 'PAUSED':
-            return { "success" : False,
-                     "error" : "cannot resume, oven state is %s" % (oven.state) }
-        oven.state = 'RUNNING'
+        ok, error = resume_run()
+        if not ok:
+            return { "success" : False, "error" : error }
 
     if bottle.request.json['cmd'] == 'stop':
         log.info("api stop command received")
         oven.abort_run()
+
+    if bottle.request.json['cmd'] == 'restart':
+        log.info("api restart command received")
+        ok, error = restart_controller()
+        if not ok:
+            return { "success" : False, "error" : error }
 
     if bottle.request.json['cmd'] == 'memo':
         log.info("api memo command received")
@@ -1335,6 +1338,79 @@ def start_run(wanted, startat=0, allow_seek=None):
                                 'startat_minutes': startat})
     return True
 
+def pause_run():
+    '''returns (ok, error)'''
+    # pausing from any other state would leave the oven thread in a
+    # PAUSED state with no profile, which it cannot run
+    if oven.state != 'RUNNING':
+        return False, "cannot pause, oven state is %s" % (oven.state)
+    oven.state = 'PAUSED'
+    return True, None
+
+def resume_run():
+    '''returns (ok, error)'''
+    if oven.state != 'PAUSED':
+        return False, "cannot resume, oven state is %s" % (oven.state)
+    oven.state = 'RUNNING'
+    return True, None
+
+def restart_controller(delay=1):
+    '''re-exec this process after delay seconds. safe to call from any
+    thread (a plain thread does the waiting, so neither the gevent hub
+    nor the caller blocks). an active firing resumes from the automatic
+    restart state file, so refuse when that is switched off.
+    returns (ok, error)'''
+    if oven.state in ('RUNNING', 'PAUSED') and not config.automatic_restarts:
+        return False, ("refusing to restart during a firing with "
+                       "automatic_restarts off, the run would be lost")
+    def _do_restart():
+        time.sleep(delay)
+        log.info("restarting process now")
+        sys.stdout.flush()
+        sys.stderr.flush()
+        logging.shutdown()
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    threading.Thread(target=_do_restart, daemon=True).start()
+    log.info("process restart scheduled")
+    return True, None
+
+def remote_command(command, argument=None):
+    '''commands from home assistant over mqtt. runs on the mqtt network
+    thread. returns (ok, error)'''
+    if command == 'run':
+        if oven.state != 'IDLE':
+            return False, "cannot start %s, oven state is %s" % (argument, oven.state)
+        if not start_run(argument):
+            return False, "profile %s not found" % argument
+        return True, None
+    if command == 'pause':
+        return pause_run()
+    if command == 'resume':
+        return resume_run()
+    if command == 'stop':
+        oven.abort_run()
+        return True, None
+    if command == 'restart':
+        return restart_controller()
+    return False, "unknown command %s" % command
+
+def profile_names():
+    return [p.get('name') for p in json.loads(get_profiles()) if p.get('name')]
+
+def start_home_assistant():
+    '''publish state and discovery to home assistant over mqtt when
+    mqtt_enable and mqtt_ha_discovery are both on'''
+    if not ha_enabled():
+        return None
+    try:
+        ha = HomeAssistant(remote_command, profile_names)
+        ovenWatcher.add_publisher(ha)
+        log.info("home assistant mqtt integration started")
+        return ha
+    except Exception as e:
+        log.error("could not start home assistant mqtt: %s" % e)
+        return None
+
 def parse_start_time(value):
     '''
     convert a start time from a unix epoch (int/float) or an ISO 8601
@@ -2216,6 +2292,7 @@ def main():
     alert_manager.emit('controller_restarted',
                        context={'simulate': bool(config.simulate),
                                 'port': port})
+    start_home_assistant()
 
     # run the scheduled runs background loop. this is a gevent greenlet
     # that yields to the hub, so it must NOT use blocking time.sleep.

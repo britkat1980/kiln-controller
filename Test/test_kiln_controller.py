@@ -1625,6 +1625,107 @@ def test_handle_api_resume_rejected_when_not_paused(monkeypatch):
         assert controller.oven.state == state
 
 
+class FakeThread:
+    started = []
+
+    def __init__(self, target, daemon=False):
+        self.target = target
+
+    def start(self):
+        FakeThread.started.append(self.target)
+
+
+@pytest.fixture
+def fake_restart(monkeypatch):
+    FakeThread.started = []
+    execs = []
+    monkeypatch.setattr(controller.threading, 'Thread', FakeThread)
+    monkeypatch.setattr(controller.os, 'execv', lambda *a: execs.append(a))
+    monkeypatch.setattr(controller.logging, 'shutdown', lambda: None)
+    return execs
+
+
+def test_handle_api_restart(monkeypatch, fake_restart):
+    monkeypatch.setattr(controller.oven, 'state', 'IDLE')
+    resp = api_call({'cmd': 'restart'}, monkeypatch)
+    assert resp == {'success': True}
+    assert len(FakeThread.started) == 1
+    FakeThread.started[0]()
+    assert len(fake_restart) == 1
+
+
+def test_restart_refused_mid_firing_without_auto_restart(monkeypatch, fake_restart):
+    monkeypatch.setattr(controller.oven, 'state', 'RUNNING')
+    monkeypatch.setattr(config, 'automatic_restarts', False)
+    resp = api_call({'cmd': 'restart'}, monkeypatch)
+    assert resp['success'] is False
+    assert FakeThread.started == []
+
+
+def test_restart_allowed_mid_firing_with_auto_restart(monkeypatch, fake_restart):
+    monkeypatch.setattr(controller.oven, 'state', 'RUNNING')
+    monkeypatch.setattr(config, 'automatic_restarts', True)
+    ok, _ = controller.restart_controller()
+    assert ok is True
+    assert len(FakeThread.started) == 1
+
+
+def test_remote_command_run(monkeypatch):
+    started = []
+    monkeypatch.setattr(controller.oven, 'state', 'IDLE')
+    monkeypatch.setattr(controller, 'start_run', lambda name: started.append(name) or True)
+    assert controller.remote_command('run', 'cone-05') == (True, None)
+    assert started == ['cone-05']
+
+
+def test_remote_command_run_refused_unless_idle(monkeypatch):
+    started = []
+    monkeypatch.setattr(controller, 'start_run', lambda name: started.append(name) or True)
+    for state in ('RUNNING', 'PAUSED', 'TUNING'):
+        monkeypatch.setattr(controller.oven, 'state', state)
+        ok, error = controller.remote_command('run', 'cone-05')
+        assert ok is False
+        assert state in error
+    assert started == []
+
+
+def test_remote_command_run_unknown_profile(monkeypatch):
+    monkeypatch.setattr(controller.oven, 'state', 'IDLE')
+    monkeypatch.setattr(controller, 'start_run', lambda name: False)
+    ok, error = controller.remote_command('run', 'nope')
+    assert ok is False
+    assert 'nope' in error
+
+
+def test_remote_command_pause_resume_stop(monkeypatch):
+    stopped = []
+    monkeypatch.setattr(controller.oven, 'abort_run', lambda: stopped.append(True))
+    monkeypatch.setattr(controller.oven, 'state', 'RUNNING')
+    assert controller.remote_command('pause') == (True, None)
+    assert controller.oven.state == 'PAUSED'
+    assert controller.remote_command('resume') == (True, None)
+    assert controller.oven.state == 'RUNNING'
+    assert controller.remote_command('stop') == (True, None)
+    assert stopped == [True]
+
+
+def test_remote_command_unknown():
+    ok, _ = controller.remote_command('explode')
+    assert ok is False
+
+
+def test_profile_names(monkeypatch, tmp_path):
+    (tmp_path / 'b.json').write_text(json.dumps({'name': 'b', 'data': [], 'temp_units': 'c'}))
+    (tmp_path / 'a.json').write_text(json.dumps({'name': 'a', 'data': [], 'temp_units': 'c'}))
+    monkeypatch.setattr(controller, 'profile_path', str(tmp_path))
+    assert controller.profile_names() == ['a', 'b']
+
+
+def test_home_assistant_off_by_default(monkeypatch):
+    monkeypatch.setattr(config, 'mqtt_enable', False, raising=False)
+    assert controller.start_home_assistant() is None
+
+
 def tune_call(payload, monkeypatch):
     monkeypatch.setattr(bottle, 'request', types.SimpleNamespace(json=payload))
     return controller.handle_tune()

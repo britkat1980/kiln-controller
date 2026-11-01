@@ -1,0 +1,93 @@
+# Home Assistant
+
+The controller can appear in Home Assistant as a single device using
+[MQTT discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery).
+No YAML is needed on the Home Assistant side, just the MQTT integration
+pointed at the same broker.
+
+## Setup
+
+In `config.py`:
+
+```python
+mqtt_enable = True
+mqtt_host = "192.168.1.10"
+mqtt_port = 1883
+mqtt_user = "mqtt"
+mqtt_pass = "secret"
+mqtt_kiln_name = "My_Kiln"      # no spaces or slashes, it is part of every topic
+mqtt_ha_discovery = True
+mqtt_ha_interval = 15           # seconds between state publishes
+mqtt_ha_prefix = "homeassistant"
+mqtt_ha_currency = "GBP"        # ISO 4217 code for the cost sensor
+```
+
+Restart the controller. The device appears under the MQTT integration,
+named after `mqtt_kiln_name`.
+
+`mqtt_enable` also turns on the upstream JSON state stream on `mqtt_topic`
+(default `kiln/sensor`). Both can run side by side.
+
+## Entities
+
+| Entity | Topic |
+|---|---|
+| temperature, temperature raw, target, heat rate, cost | `<kiln>/<key>` |
+| state, profile, name | `<kiln>/state`, `<kiln>/profile`, `<kiln>/name` |
+| heat, catching up (binary sensors, `1`/`0`) | `<kiln>/heat`, `<kiln>/catching_up` |
+| running time, duration (`H:MM:SS`) | `<kiln>/runtime`, `<kiln>/totaltime` |
+| end time (`HH:MM:SS`, `-` when idle), progress (%) | `<kiln>/endtime`, `<kiln>/progress` |
+| PID stats | `<kiln>/pidstats/<key>` |
+| availability (`online` / `offline`, last will) | `<kiln>/status` |
+
+State is published every `mqtt_ha_interval` seconds, and straight away when
+the oven state or running profile changes. Everything is retained so
+Home Assistant has values immediately after it restarts. Discovery is
+re-sent when Home Assistant announces itself on `<prefix>/status`, and when
+the list of profiles changes.
+
+## Controls
+
+| Entity | Command topic | Does |
+|---|---|---|
+| profiles (select) | `<kiln>/control/profiles` | starts the chosen profile if the kiln is idle; `None` does nothing |
+| Pause Program | `<kiln>/control/Pause_Program` | pause a running firing |
+| Resume Program | `<kiln>/control/Resume_Program` | resume a paused firing |
+| Stop Program | `<kiln>/control/Stop_Program` | stop the firing |
+| Restart Controller | `<kiln>/control/Restart_Controller` | restart the controller process (refused mid-firing if `automatic_restarts` is off) |
+
+Retained messages on control topics are ignored, so a stale command left on
+the broker can never start a firing when the controller reconnects.
+
+The same actions are available over HTTP: `POST /api` with
+`{"cmd": "run", "profile": "<name>"}`, `{"cmd": "pause"}`, `{"cmd": "resume"}`,
+`{"cmd": "stop"}` or `{"cmd": "restart"}`.
+
+## Thermocouple compensation
+
+`thermocouple_offset` adds a fixed correction. Some thermocouple / board
+combinations drift more the hotter they get. With `tc_compensation = True`
+every raw reading (in °C, straight off the board) is mapped through a
+piecewise polynomial instead, and the offset is not applied:
+
+```python
+tc_compensation = True
+tc_compensation_curve = [
+    (395,  (-3.2, 1.015)),               # raw <= 395:  1.015*raw - 3.2
+    (812,  (-18.1, 1.052)),              # raw <= 812:  1.052*raw - 18.1
+    (None, (213.47, 0.0831, 0.000842)),  # above:       213.47 + 0.0831*raw + 0.000842*raw^2
+]
+```
+
+Each entry is `(upper_bound, coefficients)` with coefficients in ascending
+powers of the raw reading. The last segment's bound is `None`.
+
+The corrected value is used everywhere: PID control, the emergency
+shutoffs, alerts, seek-start, the auto-tuner and the display.
+`temperature_raw` in the state broadcast (and the Home Assistant
+`Temperature Raw` sensor) shows the uncorrected reading so you can check
+the curve against a reference meter.
+
+**Keep segments continuous.** At each `upper_bound` the two neighbouring
+segments must give (nearly) the same value. Otherwise the reading jumps as
+the kiln passes through that point, and the PID reacts to the jump.

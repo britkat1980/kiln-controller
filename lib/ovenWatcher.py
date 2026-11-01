@@ -12,6 +12,7 @@ class OvenWatcher(threading.Thread):
         self.daemon = True
         self.oven = oven
         self.mqtt = MqttOut() if mqtt_enabled() else None
+        self.publishers = []
         # sqlite persistence for every duty cycle; a failed open must
         # never stop heater control, so fall back to no db on error.
         if db is None:
@@ -59,6 +60,14 @@ class OvenWatcher(threading.Thread):
             if self.mqtt:
                 self.mqtt.publish(oven_state)
 
+            # extra state consumers (e.g. home assistant). getattr:
+            # tests build watchers via __new__ without __init__.
+            for publisher in getattr(self, 'publishers', ()):
+                try:
+                    publisher.publish(oven_state)
+                except Exception as e:
+                    log.error("state publisher failed: %s" % e)
+
             # persist the same broadcast locally every duty cycle.
             # getattr: tests build watchers via __new__ without __init__,
             # so self.db may not exist; db failures must never break
@@ -100,6 +109,10 @@ class OvenWatcher(threading.Thread):
                 not in ('RUNNING', 'PAUSED'):
             return None
         return getattr(self, 'started', None)
+
+    def add_publisher(self, publisher):
+        '''publisher.publish(oven_state) is called every duty cycle'''
+        self.publishers.append(publisher)
 
     def add_observer(self,observer):
         if self.last_profile:

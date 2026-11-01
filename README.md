@@ -190,6 +190,21 @@ beyond the log:
 Both take effect immediately when toggled (no restart) and their settings are
 saved with the alert checkboxes.
 
+### Home Assistant
+
+With `mqtt_enable` and `mqtt_ha_discovery` on, the kiln shows up in Home
+Assistant as a device via MQTT discovery: temperatures, target, state, cost,
+progress, end time, PID stats, a profile select that starts a firing, and
+pause / resume / stop / restart buttons. See the
+[Home Assistant Guide](docs/home-assistant.md).
+
+### Thermocouple Compensation
+
+If your thermocouple reads progressively wrong as the kiln heats, a fixed
+`thermocouple_offset` is not enough. `tc_compensation` maps every reading
+through a piecewise calibration curve instead. See the
+[Home Assistant Guide](docs/home-assistant.md#thermocouple-compensation).
+
 ### Logging
 
 Daemon logs land in /var/log/daemon.log, and the **kiln-logger.py** script records a full firing to csv for graphing and analysis. See the [logging guide](docs/logs.md) for details.
