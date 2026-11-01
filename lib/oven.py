@@ -380,6 +380,11 @@ class Modbus(TempSensorReal):
         self.format = getattr(config, 'modbus_format', 'int')
         self.byteorder = getattr(config, 'modbus_byteorder', 0)
         self.fault_values = set(getattr(config, 'modbus_fault_values', []))
+        # optional status register whose bits flag faults (e.g. the
+        # Z-4TC's burn-out bits), read before each temperature
+        self.status_register = getattr(config, 'modbus_status_register', None)
+        self.status_open_bits = getattr(config, 'modbus_status_open_bits', [])
+        self.status_error_bits = getattr(config, 'modbus_status_error_bits', [])
 
         self.instrument = minimalmodbus.Instrument(port, slave)
         serial = self.instrument.serial
@@ -389,8 +394,23 @@ class Modbus(TempSensorReal):
         serial.timeout = getattr(config, 'modbus_timeout', 0.5)
         self.instrument.clear_buffers_before_each_transaction = True
 
+    def check_status(self):
+        if self.status_register is None:
+            return
+        status = self.instrument.read_register(
+            self.status_register, 0, functioncode=self.functioncode)
+        for bit in self.status_open_bits:
+            if status & (1 << bit):
+                raise Modbus_Error("status register %s bit %s set (0x%04x)" % (
+                    self.status_register, bit, status), kind='fault')
+        for bit in self.status_error_bits:
+            if status & (1 << bit):
+                raise Modbus_Error("status register %s bit %s set (0x%04x)" % (
+                    self.status_register, bit, status))
+
     def raw_temp(self):
         try:
+            self.check_status()
             if self.format == 'float':
                 value = self.instrument.read_float(
                     self.register, functioncode=self.functioncode,

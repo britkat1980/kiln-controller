@@ -123,7 +123,14 @@ thermocouple_type = adafruit_max31856.ThermocoupleType.K
 #
 # Set modbus = 1 to use it (it takes priority over max31855/max31856).
 # Configure the module itself for degrees C and the thermocouple type.
-# The register layout is in the module's manual.
+# The register layout is in the module's manual. The values below are for
+# a Seneca Z-4TC, thermocouple on input 1 (manual MI00258):
+#   input 1..4 temperature, signed, C x 10:  registers 12..15
+#   input 1..4 temperature, 32-bit float:    registers 26, 28, 30, 32
+#                                            (firmware 667 and later)
+#   status: register 11, input 1..4 burn-out = bits 12..15,
+#           input 1..4 acquisition error = bits 8..11
+# For another input, change the register and the two status bit lists.
 modbus = 0
 modbus_port_name = "/dev/ttyUSB0"
 modbus_slave_address = 1
@@ -145,6 +152,13 @@ modbus_byteorder = 0          # float only: minimalmodbus BYTEORDER_* value
 # of being used as a temperature. Check your module's manual,
 # e.g. [32767, -32768]
 modbus_fault_values = []
+# a status register read before every temperature, for modules that flag
+# faults with bits instead of fault values. set bits in
+# modbus_status_open_bits raise "not connected" (open thermocouple), in
+# modbus_status_error_bits "unknown". None skips the status read.
+modbus_status_register = 11
+modbus_status_open_bits = [12]   # Z-4TC input 1 burn-out
+modbus_status_error_bits = [8]   # Z-4TC input 1 acquisition error
 
 ########################################################################
 #

@@ -40,11 +40,38 @@ modbus_functioncode = 3        # 3 holding registers, 4 input registers
 modbus_format = "int"          # or "float" for 32-bit float readings
 modbus_decimal = 1             # int: register holds tenths of a degree
 modbus_signed = True
-modbus_fault_values = [32767]  # raw values the module uses to flag an open thermocouple
+modbus_fault_values = []       # raw values some modules use to flag an open thermocouple
+modbus_status_register = 11    # or None: a register whose bits flag faults
+modbus_status_open_bits = [12] # set -> "not connected"
+modbus_status_error_bits = [8] # set -> "unknown"
 ```
 
-Find the register, function code, format and fault values in the module's
-manual.
+Find the register, function code, format and fault reporting in the
+module's manual. Modules flag an open thermocouple either with a special
+reading (`modbus_fault_values`) or with bits in a status register
+(`modbus_status_*`). Without one of these set, an open thermocouple
+would not be detected.
+
+### Seneca Z-4TC
+
+The defaults above are for a Z-4TC with the thermocouple on input 1
+(register map from user manual MI00258):
+
+| Address (`modbus_registernumber`) | Manual | Contents |
+|---|---|---|
+| 11 | 40012 | status: bits 12–15 input 1–4 burn-out, bits 8–11 input 1–4 acquisition error |
+| 12–15 | 40013–40016 | input 1–4, signed, °C × 10 (`modbus_decimal = 1`) |
+| 26, 28, 30, 32 | 40027–40034 | input 1–4, 32-bit float °C (`modbus_format = "float"`, firmware 667+) |
+
+For another input, change `modbus_registernumber` and both status bit
+lists, e.g. input 2 is register 13, open bit 13 and error bit 9.
+
+- Function code 3 only.
+- Set the thermocouple type with Seneca's Easy-SETUP software or over
+  Modbus (registers 40004–40007).
+- Burn-out detection is on by default.
+- The RS-485 baud rate, parity and address come from the module's DIP
+  switches or Easy-SETUP. Make `config.py` match them.
 
 ## Test
 

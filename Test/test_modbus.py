@@ -21,12 +21,18 @@ class FakeInstrument:
         self.serial = types.SimpleNamespace(baudrate=None, parity=None,
                                             stopbits=None, timeout=None)
         self.register_value = 0
+        self.status_value = 0
         self.float_value = 0.0
         self.error = None
         self.calls = []
         FakeInstrument.instances.append(self)
 
     def read_register(self, register, decimals, functioncode=3, signed=False):
+        if register == getattr(config, 'modbus_status_register', None):
+            self.calls.append(('status', register, functioncode))
+            if self.error:
+                raise self.error
+            return self.status_value
         self.calls.append(('register', register, decimals, functioncode, signed))
         if self.error:
             raise self.error
@@ -57,6 +63,8 @@ def modbus(monkeypatch):
                     modbus_format='int', modbus_byteorder=0,
                     modbus_parity='N', modbus_stopbits=1, modbus_timeout=0.5,
                     modbus_fault_values=[32767, -32768],
+                    modbus_status_register=None, modbus_status_open_bits=[],
+                    modbus_status_error_bits=[],
                     sensor_time_wait=2, temperature_average_samples=5,
                     ignore_tc_unknown_error=False, ignore_tc_lost_connection=False)
     for key, value in settings.items():
@@ -151,7 +159,9 @@ def test_old_pr_config_without_new_keys(modbus, monkeypatch):
     '''configs written for upstream PR #245 only have the original keys'''
     for key in ('modbus_functioncode', 'modbus_signed', 'modbus_format',
                 'modbus_byteorder', 'modbus_parity', 'modbus_stopbits',
-                'modbus_timeout', 'modbus_fault_values'):
+                'modbus_timeout', 'modbus_fault_values',
+                'modbus_status_register', 'modbus_status_open_bits',
+                'modbus_status_error_bits'):
         monkeypatch.delattr(config, key, raising=False)
     sensor, inst = modbus()
     inst.register_value = 9876
@@ -175,3 +185,60 @@ def test_board_without_modbus_setting(monkeypatch):
     monkeypatch.setattr(oven, 'Max31855', lambda: picked.append('max31855') or 'sensor')
     assert oven.RealBoard.choose_tempsensor(object()) == 'sensor'
     assert picked == ['max31855']
+
+
+@pytest.fixture
+def z4tc(modbus, monkeypatch):
+    '''Seneca Z-4TC, thermocouple on input 1'''
+    monkeypatch.setattr(config, 'modbus_status_register', 11)
+    monkeypatch.setattr(config, 'modbus_status_open_bits', [12])
+    monkeypatch.setattr(config, 'modbus_status_error_bits', [8])
+    return modbus
+
+
+def test_status_checked_before_temperature(z4tc):
+    sensor, inst = z4tc()
+    inst.register_value = 220
+    assert sensor.raw_temp() == pytest.approx(22.0)
+    assert [c[0] for c in inst.calls] == ['status', 'register']
+    assert inst.calls[0] == ('status', 11, 3)
+
+
+def test_status_burnout_is_not_connected(z4tc):
+    sensor, inst = z4tc()
+    inst.status_value = 1 << 12
+    with pytest.raises(Modbus_Error) as exc:
+        sensor.raw_temp()
+    assert exc.value.message == 'not connected'
+    assert 'bit 12' in exc.value.orig_message
+
+
+def test_status_acquisition_error_is_unknown(z4tc):
+    sensor, inst = z4tc()
+    inst.status_value = 1 << 8
+    with pytest.raises(Modbus_Error) as exc:
+        sensor.raw_temp()
+    assert exc.value.message == 'unknown'
+
+
+def test_other_inputs_status_bits_ignored(z4tc):
+    '''a burn-out on input 2-4 must not stop a kiln wired to input 1'''
+    sensor, inst = z4tc()
+    inst.status_value = (1 << 13) | (1 << 14) | (1 << 15) | (1 << 9)
+    inst.register_value = 12220
+    assert sensor.raw_temp() == pytest.approx(1222.0)
+
+
+def test_status_read_failure_is_comms_error(z4tc):
+    sensor, inst = z4tc()
+    inst.error = NoResponseError("no answer")
+    with pytest.raises(Modbus_Error) as exc:
+        sensor.raw_temp()
+    assert exc.value.message == 'unknown'
+
+
+def test_no_status_read_when_disabled(modbus):
+    sensor, inst = modbus()
+    inst.register_value = 100
+    sensor.raw_temp()
+    assert [c[0] for c in inst.calls] == ['register']
