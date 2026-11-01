@@ -34,3 +34,18 @@ Imager on Raspberry Pi OS Trixie (and later) configures the card with
 cloud-init instead of `firstrun.sh`. On those images `prepare-sd.ps1` still
 copies the files but cannot hook the first boot, and warns you. After the
 first boot, run `sudo bash /boot/firmware/kiln-setup/install.sh` over ssh.
+
+## Touchscreen kiosk
+
+To show the controller full screen on a display attached to the Pi (for
+example the official 7" touchscreen), use the Raspberry Pi OS image *with
+desktop*, with desktop autologin on, and run as the desktop user:
+
+```bash
+bash ~/kiln-controller/pi-setup/kiosk.sh
+```
+
+then reboot. Chromium opens the controller page once the service answers,
+and is restarted if it exits. Its output goes to `~/.cache/kiln-kiosk.log`.
+On a Pi 3 it takes a minute or two to appear after boot. Undo with
+`bash ~/kiln-controller/pi-setup/kiosk.sh --remove`.
