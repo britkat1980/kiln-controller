@@ -477,6 +477,9 @@ class Oven(threading.Thread):
         # outage left an unresumed firing behind
         self.restart_outage_checked = False
         self.cooled_safe_armed_for = None
+        # when and in which state the restart file was last written
+        self.last_save_time = None
+        self.last_saved_state = None
         self.reset()
         # each firing gets an increasing run_sequence. ended_run_sequence
         # remembers the highest sequence that has finished so scheduled
@@ -588,7 +591,7 @@ class Oven(threading.Thread):
                     watcher.started = None
         except Exception:
             pass
-        self.save_automatic_restart_state()
+        self.save_automatic_restart_state(force=True)
         self.end_of_run(reason, context, was_active)
 
     def end_of_run(self, reason, context, was_active):
@@ -771,7 +774,10 @@ class Oven(threading.Thread):
         # relay_stuck_on: elements commanded fully off but temperature
         # keeps climbing over the window. some rise is expected right
         # after shutoff while the elements dump their stored heat, hence
-        # the generous threshold.
+        # the generous threshold. it must also still be climbing over
+        # the last quarter of the window: opening the lid drops the
+        # reading sharply and it recovers once the lid is shut, a rise
+        # that levels off, where live elements keep the kiln climbing.
         if self.state == 'TUNING' or self.heat:
             # tuning drives the output directly without updating heat,
             # and any commanded heat obviously explains a rising kiln
@@ -785,8 +791,12 @@ class Oven(threading.Thread):
                                 if t >= now - window]
         first_time = self.relay_off_temps[0][0]
         first_temp = self.relay_off_temps[0][1]
+        rise = delta_to_c(config.relay_stuck_on_rise)
+        recent_temp = next(x for (t, x) in self.relay_off_temps
+                           if t >= now - window * 0.25)
         if now - first_time >= window * 0.9 and \
-                temp - first_temp > delta_to_c(config.relay_stuck_on_rise):
+                temp - first_temp > rise and \
+                temp - recent_temp > rise / 8:
             self._emit('relay_stuck_on',
                        rise=round(delta_to_display(temp - first_temp), 1),
                        minutes=config.relay_stuck_on_window,
@@ -952,11 +962,27 @@ class Oven(threading.Thread):
                 return False
         return True
 
-    def save_automatic_restart_state(self):
+    def save_automatic_restart_state(self, force=False):
         # only save state if the feature is enabled
         if not config.automatic_restarts == True:
             return False
+        # every save is an fsync, which a slow sd card can stall for
+        # seconds, and the controller with it. so save at most every
+        # automatic_restart_save_interval seconds. a change of state
+        # (start, pause, resume) saves straight away, so a resume never
+        # restores the wrong state; it only loses up to one interval of
+        # runtime, i.e. re-runs a few seconds of the schedule.
+        now = time.time()
+        interval = getattr(config, 'automatic_restart_save_interval', 30)
+        last_time = getattr(self, 'last_save_time', None)
+        if not force and last_time is not None and \
+                self.state == getattr(self, 'last_saved_state', None) and \
+                0 <= now - last_time < interval:
+            return None
         self.save_state()
+        self.last_save_time = now
+        self.last_saved_state = self.state
+        return True
 
     def should_i_automatic_restart(self):
         # only automatic restart if the feature is enabled
@@ -1019,7 +1045,7 @@ class Oven(threading.Thread):
             runtime = 0
         try:
             self.reset()
-            self.save_automatic_restart_state()
+            self.save_automatic_restart_state(force=True)
         except Exception as e:
             log.error("could not clear failed automatic restart state: %s"
                       % (e))

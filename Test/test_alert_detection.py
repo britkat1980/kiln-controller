@@ -594,3 +594,87 @@ def test_disabled_condition_never_delivered(fake_clock, no_restart_writes):
     oven.board.temp_sensor.temp = to_c(500)
     oven.check_safety_detectors()
     assert sink.calls == []
+
+
+def test_lid_opened_and_closed_does_not_fire(fake_clock, no_restart_writes, monkeypatch):
+    '''2026-11-02 19:11: kiln opened at 83C while cooling (reading fell
+    to 54C in 4 minutes), lid shut, reading recovered to 68C and levelled
+    off. elements were off throughout: not a stuck relay.'''
+    monkeypatch.setattr(config, 'relay_stuck_on_rise', 14)
+    monkeypatch.setattr(config, 'relay_stuck_on_window', 10)
+    monkeypatch.setattr(config, 'temp_scale', 'c')
+    oven, _, sink = make_oven(temp_c=83.0)
+    readings = ([83.0 - i * 2.0 for i in range(15)]  # lid open: 83 -> 55
+                + [54.1, 56.2, 58.3, 59.7, 60.8, 61.8, 62.5, 63.0, 63.8,
+                   64.3, 64.8, 65.3, 65.5, 66.0, 66.3, 66.5, 66.8, 67.0,
+                   67.2, 67.4, 67.5, 67.7, 67.9, 68.0, 68.1, 68.2, 68.3,
+                   68.4, 68.5, 68.4, 68.3, 68.2]
+                + [68.2 - i * 0.02 for i in range(40)])  # slow cooling
+    for temp in readings:
+        oven.board.temp_sensor.temp = temp
+        oven.check_safety_detectors()
+        fake_clock.advance(16)
+    assert [c[0] for c in sink.calls if c[0] == 'relay_stuck_on'] == []
+
+
+def test_stuck_relay_after_lid_dip_still_fires(fake_clock, no_restart_writes, monkeypatch):
+    '''a dip does not mask a relay that really is stuck: the kiln keeps
+    climbing to the end of the window'''
+    monkeypatch.setattr(config, 'relay_stuck_on_rise', 14)
+    monkeypatch.setattr(config, 'relay_stuck_on_window', 10)
+    monkeypatch.setattr(config, 'temp_scale', 'c')
+    oven, _, sink = make_oven(temp_c=60.0)
+    for i in range(60):  # 2C a minute, steadily, for 16 minutes
+        oven.board.temp_sensor.temp = 60.0 + i * 16 / 60 * 2
+        oven.check_safety_detectors()
+        fake_clock.advance(16)
+    assert 'relay_stuck_on' in [c[0] for c in sink.calls]
+
+
+@pytest.fixture
+def counted_saves(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, 'automatic_restarts', True)
+    monkeypatch.setattr(config, 'automatic_restart_state_file',
+                        str(tmp_path / 'state.json'))
+    monkeypatch.setattr(config, 'automatic_restart_save_interval', 30)
+    saves = []
+    monkeypatch.setattr(Oven, 'save_state', lambda self: saves.append(self.state))
+    return saves
+
+
+def test_restart_state_saved_at_most_every_interval(fake_clock, counted_saves):
+    oven, _, _ = make_oven()
+    oven.state = 'RUNNING'
+    for _ in range(60):  # one minute of 1s duty cycles
+        oven.save_automatic_restart_state()
+        fake_clock.advance(1)
+    assert counted_saves == ['RUNNING', 'RUNNING']
+
+
+def test_restart_state_saved_at_once_on_state_change(fake_clock, counted_saves):
+    oven, _, _ = make_oven()
+    oven.state = 'RUNNING'
+    oven.save_automatic_restart_state()
+    fake_clock.advance(2)
+    oven.state = 'PAUSED'
+    oven.save_automatic_restart_state()
+    fake_clock.advance(2)
+    oven.state = 'RUNNING'
+    oven.save_automatic_restart_state()
+    assert counted_saves == ['RUNNING', 'PAUSED', 'RUNNING']
+
+
+def test_forced_restart_state_save_ignores_interval(fake_clock, counted_saves):
+    oven, _, _ = make_oven()
+    oven.state = 'RUNNING'
+    oven.save_automatic_restart_state()
+    oven.save_automatic_restart_state(force=True)
+    assert counted_saves == ['RUNNING', 'RUNNING']
+
+
+def test_end_of_run_always_saves(fake_clock, counted_saves):
+    oven, _, _ = make_oven(temp_c=to_c(500))
+    oven.run_profile(fast_profile(), allow_seek=False)
+    oven.save_automatic_restart_state()
+    oven.abort_run(reason=END_STOPPED)
+    assert counted_saves[-1] == 'IDLE'

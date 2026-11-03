@@ -351,6 +351,7 @@ alert_webhook_timeout = 10 # seconds before giving up on a webhook post
 # and is written in the same directory as config.py.
 automatic_restarts = True
 automatic_restart_window = 15 # max minutes since power outage
+automatic_restart_save_interval = 30 # seconds between restart-state saves while firing (each one is an sd card fsync)
 automatic_restart_state_file = os.path.abspath(os.path.join(os.path.dirname( __file__ ),'state.json'))
 
 ########################################################################
