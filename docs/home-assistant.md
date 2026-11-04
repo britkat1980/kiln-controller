@@ -119,13 +119,85 @@ card:
 | Resume Program | `<kiln>/control/Resume_Program` | resume a paused firing |
 | Stop Program | `<kiln>/control/Stop_Program` | stop the firing |
 | Restart Controller | `<kiln>/control/Restart_Controller` | restart the controller process (refused mid-firing if `automatic_restarts` is off) |
+| Shutdown Pi | `<kiln>/control/Shutdown_Pi` | power the computer off; only with `allow_remote_shutdown = True`, only while idle, never in a simulation |
 
 Retained messages on control topics are ignored, so a stale command left on
 the broker can never start a firing when the controller reconnects.
 
-The same actions are available over HTTP: `POST /api` with
-`{"cmd": "run", "profile": "<name>"}`, `{"cmd": "pause"}`, `{"cmd": "resume"}`,
-`{"cmd": "stop"}` or `{"cmd": "restart"}`.
+The same actions, apart from Shutdown Pi, are available over HTTP:
+`POST /api` with `{"cmd": "run", "profile": "<name>"}`, `{"cmd": "pause"}`,
+`{"cmd": "resume"}`, `{"cmd": "stop"}` or `{"cmd": "restart"}`.
+
+## Switching the kiln's power off safely
+
+If the Pi is powered from the same smart socket as the kiln, cutting the
+socket while the Pi runs risks corrupting its SD card. Set
+`allow_remote_shutdown = True`, then let a script shut the Pi down first.
+This one refuses while firing (or while the socket shows the elements
+drawing power), presses Shutdown Pi, waits for the controller to go
+offline, gives the Pi 30 seconds to halt, and only then switches the
+socket off. If the Pi does not go offline within 2 minutes it leaves the
+socket on and raises a notification. Change the entity ids to yours.
+
+```yaml
+alias: Kiln power off
+mode: single
+sequence:
+  - if:
+      - condition: state
+        entity_id: switch.kiln_socket
+        state: "off"
+    then:
+      - stop: Kiln socket is already off
+  - if:
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: sensor.my_kiln_state
+            state: [RUNNING, PAUSED, TUNING]
+          - condition: numeric_state
+            entity_id: sensor.kiln_socket_power
+            above: 100
+    then:
+      - action: persistent_notification.create
+        data:
+          title: Kiln power off refused
+          message: The kiln is firing, so the socket was left on.
+      - stop: Kiln is firing
+        error: true
+  - if:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: sensor.my_kiln_state
+            state: unavailable
+    then:
+      - action: button.press
+        target:
+          entity_id: button.my_kiln_shutdown_pi
+      - wait_template: "{{ is_state('sensor.my_kiln_state', 'unavailable') }}"
+        timeout: "00:02:00"
+        continue_on_timeout: true
+      - if:
+          - condition: template
+            value_template: "{{ not wait.completed }}"
+        then:
+          - action: persistent_notification.create
+            data:
+              title: Kiln power off stopped
+              message: The Pi did not shut down, so the socket was left on.
+          - stop: Pi did not shut down
+            error: true
+      - delay: "00:00:30"
+  - action: switch.turn_off
+    target:
+      entity_id: switch.kiln_socket
+```
+
+A template switch helper (Settings → Devices & services → Helpers →
+Template → Switch) makes it one toggle: state
+`{{ is_state('switch.kiln_socket', 'on') }}`, turn on `switch.turn_on` the
+socket, turn off `script.turn_on` this script.
 
 ## Thermocouple compensation
 
