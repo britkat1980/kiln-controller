@@ -183,6 +183,9 @@ def api_dump():
     with tarfile.open(fileobj=out, mode='w:gz') as tar:
         _tar_add_bytes(tar, 'version.txt', __version__ + '\n')
         _tar_add_path(tar, 'config.py', config.__file__)
+        local = getattr(config, 'config_local_file', None)
+        if local and os.path.isfile(local):
+            _tar_add_path(tar, 'config_local.py', local)
         _tar_add_path(tar, 'state.json', config.automatic_restart_state_file)
         for filename in profile_files():
             _tar_add_path(tar, os.path.join('profiles', filename),
@@ -1555,33 +1558,46 @@ def reload_config_module():
             pass
     importlib.reload(config)
 
+def config_edit_path():
+    '''the file the config editor edits: config_local.py (the user's
+    own settings, see the end of config.py) when there is one,
+    otherwise config.py itself.'''
+    local = getattr(config, 'config_local_file', None)
+    if local and os.path.isfile(local):
+        return local
+    return config.__file__
+
 def save_config(text):
-    '''validate and write config.py, then reload the config module so
-    the running process uses the new values. if the reload fails the
-    previous config is restored and the reload is retried.'''
-    compile(text, 'config.py', 'exec')
-    with open(config.__file__, 'r') as f:
+    '''validate and write the edited config file, then reload the config
+    module so the running process uses the new values. if the reload
+    fails the previous file is restored and the reload is retried.'''
+    path = config_edit_path()
+    compile(text, os.path.basename(path), 'exec')
+    with open(path, 'r', encoding='utf-8') as f:
         original = f.read()
-    with open(config.__file__, 'w') as f:
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(text)
     try:
         reload_config_module()
     except Exception:
-        with open(config.__file__, 'w') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             f.write(original)
         reload_config_module()
         raise
 
 @app.get('/api/config/editor')
 def api_config_editor():
-    '''return the raw contents of config.py for editing.'''
+    '''return the raw contents of the config file for editing, and its
+    name in X-Config-File so the page can show which file it is.'''
+    path = config_edit_path()
     try:
-        with open(config.__file__, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             text = f.read()
     except Exception as e:
-        log.error("could not read config.py: %s" % e)
+        log.error("could not read %s: %s" % (path, e))
         return bottle.HTTPResponse(str(e), status=500)
-    return bottle.HTTPResponse(text, headers={'Content-Type': 'text/plain'})
+    return bottle.HTTPResponse(text, headers={'Content-Type': 'text/plain',
+                                              'X-Config-File': os.path.basename(path)})
 
 @app.post('/api/config/editor')
 def api_config_editor_save():

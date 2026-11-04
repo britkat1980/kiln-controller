@@ -102,7 +102,11 @@ If you're done playing around with simulations and want to deploy the code on a 
 
 ## Configuration
 
-All parameters are defined in config.py. You need to read through config.py carefully to understand each setting. Here are some of the most important settings:
+All parameters are defined in config.py, which holds the defaults and documents each setting. You need to read through config.py carefully to understand each setting.
+
+Put your own settings in `config_local.py`, next to config.py, rather than editing config.py itself: copy `config_local.example.py` to `config_local.py` and set only what differs from the defaults. It is read after config.py, so its values win, and git does not track it, so updating the controller (`git pull`) never conflicts with or overwrites your settings. The Config tab's editor and the PID auto-tuner change `config_local.py` when it exists. An existing full config.py works too: copy it to `config_local.py` and then `git checkout config.py`.
+
+Here are some of the most important settings:
 
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
@@ -133,8 +137,9 @@ and you can use this script to examine each pin's state including input/output/v
 
 The Config tab on the web interface includes a built-in **PID Auto-Tuner** that heats 
 the kiln at full power to 400F, records the heating curve, and calculates optimal PID values using
-the Ziegler-Nichols method. The new values are written to `config.py`
-automatically and the controller restarts. See the
+the Ziegler-Nichols method. The new values are written to `config_local.py`
+(or `config.py` if you have no `config_local.py`) automatically and the
+controller restarts. See the
 [Web Interface Guide](docs/web-interface.md) for details.
 
 If you end up having to manually tune, here is a

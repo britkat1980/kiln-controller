@@ -296,3 +296,89 @@ def test_post_restart_greenlet_execs_process(fake_config, spawn_log, monkeypatch
 
     assert len(execv_calls) == 1
     assert execv_calls[0][0] == sys.executable
+
+
+########################################################################
+# config_local.py: the user's own settings, read after config.py
+########################################################################
+
+# the tail of the real config.py, so these tests use its loader
+LOADER = open(os.path.join(os.path.dirname(__file__), '..', 'config.py'),
+              encoding='utf-8').read().split('# local settings - keep this last.')[1]
+CONFIG_WITH_LOADER = 'import os\n' + CONFIG_TMPL + LOADER
+
+
+@pytest.fixture
+def local_config(fake_config):
+    '''fake_config whose config.py ends with the real loader and has a
+    config_local.py next to it overriding kwh_rate'''
+    module, path = fake_config
+    path.write_text(CONFIG_WITH_LOADER)
+    local = path.parent / 'config_local.py'
+    local.write_text('kwh_rate = 0.059\n', encoding='utf-8')
+    controller.reload_config_module()
+    return module, path, local
+
+
+def test_local_settings_override_defaults(local_config):
+    module, path, local = local_config
+    assert module.kwh_rate == 0.059
+    assert module.simulate is True  # untouched defaults stay
+    assert module.config_local_file == str(local)
+
+
+def test_local_settings_can_use_config_names(local_config):
+    '''config_local.py runs inside config.py, so it can use what config.py
+    imported or defined (board for pins, os, earlier settings)'''
+    module, path, local = local_config
+    local.write_text('simulate = not simulate\nsep = os.sep\n', encoding='utf-8')
+    controller.reload_config_module()
+    assert module.simulate is False
+    assert module.sep == os.sep
+
+
+def test_removing_a_local_setting_restores_the_default(local_config):
+    module, path, local = local_config
+    local.write_text('# nothing\n', encoding='utf-8')
+    controller.reload_config_module()
+    assert module.kwh_rate == 0.1319
+
+
+def test_no_local_file_means_defaults(local_config):
+    module, path, local = local_config
+    local.unlink()
+    controller.reload_config_module()
+    assert module.kwh_rate == 0.1319
+
+
+def test_editor_edits_local_file_when_present(local_config, spawn_log):
+    module, path, local = local_config
+    resp = controller.api_config_editor()
+    body = resp.body.decode() if isinstance(resp.body, bytes) else resp.body
+    assert body == 'kwh_rate = 0.059\n'
+    assert resp.headers['X-Config-File'] == 'config_local.py'
+
+    out, resp = post_config({'config': 'kwh_rate = 0.3\n'})
+    assert out['status'] == '200 OK', (out['status'], resp)
+    assert local.read_text(encoding='utf-8') == 'kwh_rate = 0.3\n'
+    assert path.read_text() == CONFIG_WITH_LOADER  # defaults untouched
+    assert module.kwh_rate == 0.3
+
+
+def test_bad_local_edit_is_rolled_back(local_config, spawn_log):
+    module, path, local = local_config
+    out, resp = post_config({'config': 'raise RuntimeError("boom")\n'})
+    assert json.loads(resp)['success'] is False
+    assert local.read_text(encoding='utf-8') == 'kwh_rate = 0.059\n'
+    assert module.kwh_rate == 0.059
+
+
+def test_editor_names_config_py_without_local_file(fake_config):
+    resp = controller.api_config_editor()
+    assert resp.headers['X-Config-File'] == 'config.py'
+
+
+def test_config_local_is_not_tracked():
+    root = os.path.join(os.path.dirname(__file__), '..')
+    with open(os.path.join(root, '.gitignore')) as f:
+        assert 'config_local.py' in f.read().split()

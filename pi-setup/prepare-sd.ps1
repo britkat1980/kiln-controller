@@ -8,16 +8,18 @@
   partition; this script adds a few lines to it that install a systemd service,
   which runs pi-setup/install.sh once the network is up on the next boot.
 
-  Copies install.sh and (optionally) your config.py to <boot>\kiln-setup\.
-  install.sh moves config.py into place and deletes it from the card.
+  Copies install.sh and (optionally) your settings to <boot>\kiln-setup\.
+  install.sh puts them in place as config_local.py and deletes them from
+  the card. -ConfigPath may be a config_local.py, or a full config.py
+  from before config_local.py existed.
 
 .EXAMPLE
   .\prepare-sd.ps1
-  .\prepare-sd.ps1 -BootDrive E: -ConfigPath C:\path\to\config.py
+  .\prepare-sd.ps1 -BootDrive E: -ConfigPath C:\path\to\config_local.py
 #>
 param(
     [string]$BootDrive,
-    [string]$ConfigPath = (Join-Path $PSScriptRoot '..\..\config-v2-for-pi.py')
+    [string]$ConfigPath = (Join-Path $PSScriptRoot '..\..\config_local-for-pi.py')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,10 +50,10 @@ Write-LfFile (Join-Path $setupDir 'install.sh') ([IO.File]::ReadAllText((Join-Pa
 Write-Host "Copied install.sh"
 
 if ($ConfigPath -and (Test-Path $ConfigPath)) {
-    Write-LfFile (Join-Path $setupDir 'config.py') ([IO.File]::ReadAllText((Resolve-Path $ConfigPath)))
+    Write-LfFile (Join-Path $setupDir 'config_local.py') ([IO.File]::ReadAllText((Resolve-Path $ConfigPath)))
     Write-Host "Copied config: $(Resolve-Path $ConfigPath)"
 } else {
-    Write-Warning "No config found at '$ConfigPath'. The Pi will use the repo default config (simulate = True)."
+    Write-Warning "No config found at '$ConfigPath'. The Pi will use the repo defaults (simulate = True)."
 }
 
 # hook into firstrun.sh

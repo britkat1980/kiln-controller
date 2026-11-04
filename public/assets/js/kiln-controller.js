@@ -1234,9 +1234,9 @@ function saveConfig() {
     .then(function(resp) {
         if (resp.success) {
             if (resp.restart_scheduled) {
-                showGrowl('config.py saved. Restarting controller to load all settings... the page will reconnect in a few seconds.', 'success', 8000);
+                showGrowl($('config_file_name').textContent + ' saved. Restarting controller to load all settings... the page will reconnect in a few seconds.', 'success', 8000);
             } else {
-                showGrowl('config.py saved and reloaded.', 'success', 5000);
+                showGrowl($('config_file_name').textContent + ' saved and reloaded.', 'success', 5000);
                 if (resp.warning) {
                     showGrowl('<i class="bi bi-exclamation-triangle-fill"></i> ' + resp.warning, 'error', 8000);
                 }
@@ -1259,6 +1259,8 @@ function loadConfigEditor() {
         if (!r.ok) {
             throw new Error('HTTP ' + r.status);
         }
+        // config_local.py when the user keeps their settings there
+        $('config_file_name').textContent = r.headers.get('X-Config-File') || 'config.py';
         return r.text();
     })
     .then(function(text) {

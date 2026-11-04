@@ -341,29 +341,36 @@ class Tuner:
                  (pid_kp, pid_ki, pid_kd))
 
     def _apply_pid(self):
-        '''Write the calculated PID values into config.py and reload.'''
+        '''Write the calculated PID values into config_local.py (the
+        user's own settings, see the end of config.py) when there is one,
+        else config.py, and reload.'''
         if not self.pid_values:
             return
 
-        kp = self.pid_values["kp"]
-        ki = self.pid_values["ki"]
-        kd = self.pid_values["kd"]
-
-        # read current config.py
-        config_path = config.__file__
-        with open(config_path, 'r') as f:
+        local = getattr(config, 'config_local_file', None)
+        if local and os.path.isfile(local):
+            config_path = local
+        else:
+            config_path = config.__file__
+        with open(config_path, 'r', encoding='utf-8') as f:
             text = f.read()
 
-        # replace pid lines
-        text = re.sub(r'pid_kp\s*=\s*[\d.]+', 'pid_kp = %s' % kp, text)
-        text = re.sub(r'pid_ki\s*=\s*[\d.]+', 'pid_ki = %s' % ki, text)
-        text = re.sub(r'pid_kd\s*=\s*[\d.]+', 'pid_kd = %s' % kd, text)
+        # replace the pid lines, adding any that are missing (a
+        # config_local.py only lists what differs from the defaults)
+        for name in ('kp', 'ki', 'kd'):
+            line = 'pid_%s = %s' % (name, self.pid_values[name])
+            text, n = re.subn(r'^pid_%s\s*=\s*[-\d.eE]+' % name, line, text,
+                              count=1, flags=re.M)
+            if n == 0:
+                if text and not text.endswith('\n'):
+                    text += '\n'
+                text += line + '\n'
 
         # validate syntax before writing
-        compile(text, 'config.py', 'exec')
+        compile(text, os.path.basename(config_path), 'exec')
 
         # write the file
-        with open(config_path, 'w') as f:
+        with open(config_path, 'w', encoding='utf-8') as f:
             f.write(text)
 
         log.info("wrote new PID values to %s" % config_path)

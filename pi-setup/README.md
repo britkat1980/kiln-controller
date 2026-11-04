@@ -10,8 +10,8 @@ Makes a freshly imaged card install kiln-controller by itself on first boot.
 3. In PowerShell, from this folder:
 
    ```powershell
-   .\prepare-sd.ps1                       # finds the bootfs drive and ..\..\config-v2-for-pi.py
-   .\prepare-sd.ps1 -BootDrive E: -ConfigPath C:\path\to\config.py
+   .\prepare-sd.ps1                       # finds the bootfs drive and ..\..\config_local-for-pi.py
+   .\prepare-sd.ps1 -BootDrive E: -ConfigPath C:\path\to\config_local.py
    ```
 
    If PowerShell blocks the script, run
@@ -19,14 +19,15 @@ Makes a freshly imaged card install kiln-controller by itself on first boot.
 
 4. Eject the card and boot the Pi. Imager's first-run script reboots once.
    The install then runs (10-20 minutes on slower Pis): packages, a clone of
-   the repo into `~/kiln-controller`, the venv, your `config.py`, and the
+   the repo into `~/kiln-controller`, the venv, your settings as
+   `config_local.py` (see Configuration in the main README), and the
    `kiln-controller` service, which it starts.
 
 Follow the progress with `ssh <user>@<pi> tail -f /var/log/kiln-setup.log`.
 The install runs once. To re-run it, `sudo rm /var/lib/kiln-setup.done`
 and `sudo bash /boot/firmware/kiln-setup/install.sh`.
 
-`config.py` is deleted from the boot partition once installed, because
+Your settings file is deleted from the boot partition once installed, because
 that partition can be read by anyone holding the card and the file holds
 the MQTT password.
 

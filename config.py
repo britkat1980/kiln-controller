@@ -3,6 +3,14 @@ import os
 
 ########################################################################
 #
+# This file holds the defaults and documents every setting. Put your own
+# settings in config_local.py next to it rather than editing this file:
+# config_local.py is read last, so anything set there replaces the
+# default here, and git does not track it, so updates never touch it.
+# config_local.example.py is a starting point. See the end of this file.
+
+########################################################################
+#
 #   General options
 
 ### Logging
@@ -439,3 +447,15 @@ throttle_percent = 20
 #mqtt_ha_interval = 15           # seconds between state publishes
 #mqtt_ha_prefix = "homeassistant" # home assistant discovery prefix
 #mqtt_ha_currency = "GBP"         # ISO 4217 code for the cost sensor
+
+########################################################################
+# local settings - keep this last.
+# config_local.py is plain python run in this module after the defaults
+# above, so it only needs the settings that differ, and can use anything
+# defined above (board, os, ...). the web ui's config editor edits it
+# when it exists. it is not tracked by git.
+config_local_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config_local.py')
+if os.path.isfile(config_local_file):
+    with open(config_local_file, encoding='utf-8') as _local:
+        exec(compile(_local.read(), config_local_file, 'exec'))
+    del _local

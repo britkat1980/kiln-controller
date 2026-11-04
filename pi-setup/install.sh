@@ -1,7 +1,7 @@
 #!/bin/bash
 # one-shot kiln-controller install for a freshly imaged raspberry pi.
 #
-# prepare-sd.ps1 copies this script (and optionally config.py) to
+# prepare-sd.ps1 copies this script (and optionally config_local.py) to
 # <boot partition>/kiln-setup/ and hooks it into imager's firstrun.sh,
 # which installs kiln-setup.service to run it once the network is up.
 # it can also be run by hand: sudo bash install.sh
@@ -57,15 +57,24 @@ fi
 sudo -u "$USER_NAME" python3 -m venv "$REPO_DIR/venv"
 sudo -u "$USER_NAME" "$REPO_DIR/venv/bin/pip" install -e "$REPO_DIR"
 
-# install the user's config, then take it off the boot partition: that
-# partition is FAT, readable by anyone holding the card, and config.py
-# holds the mqtt password
-if [ -n "$SETUP_DIR" ] && [ -f "$SETUP_DIR/config.py" ]; then
-    install -o "$USER_NAME" -g "$USER_NAME" -m 600 "$SETUP_DIR/config.py" "$REPO_DIR/config.py"
-    rm -f "$SETUP_DIR/config.py"
-    echo "installed config.py"
-else
-    echo "no config.py on the boot partition, using the repo default (simulate = True)"
+# install the user's settings as config_local.py (read after the tracked
+# config.py, see its end), then take them off the boot partition: that
+# partition is FAT, readable by anyone holding the card, and the file
+# holds the mqtt password. a full config.py from before config_local.py
+# existed works as config_local.py too: it simply sets every value.
+installed=""
+for f in config_local.py config.py; do
+    if [ -n "$SETUP_DIR" ] && [ -f "$SETUP_DIR/$f" ]; then
+        if [ -z "$installed" ]; then
+            install -o "$USER_NAME" -g "$USER_NAME" -m 600 "$SETUP_DIR/$f" "$REPO_DIR/config_local.py"
+            installed="$f"
+            echo "installed $f as config_local.py"
+        fi
+        rm -f "$SETUP_DIR/$f"
+    fi
+done
+if [ -z "$installed" ]; then
+    echo "no config_local.py on the boot partition, using the repo defaults (simulate = True)"
 fi
 
 bash "$REPO_DIR/start-on-boot"
