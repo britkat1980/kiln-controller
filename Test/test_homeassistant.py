@@ -284,3 +284,18 @@ def test_schedule_lookup_error_is_harmless(ha):
     ha.schedule = broken
     msgs = dict(ha.state_messages(state()))
     assert json.loads(msgs['schedule/attributes'])['points'] == []
+
+
+def test_shutdown_button_only_when_allowed(ha, monkeypatch):
+    topic = 'homeassistant/button/kiln_controller/Shutdown_Pi/config'
+    monkeypatch.setattr(config, 'allow_remote_shutdown', False, raising=False)
+    assert topic not in dict(ha.discovery_configs())
+    monkeypatch.setattr(config, 'allow_remote_shutdown', True)
+    button = json.loads(dict(ha.discovery_configs())[topic])
+    assert button['unique_id'] == 'Kittec_CB40_Shutdown_Pi'
+    assert button['command_topic'] == 'Kittec_CB40/control/Shutdown_Pi'
+
+
+def test_shutdown_button_command(ha):
+    ha.handle_command('Shutdown_Pi', 'PRESS')
+    assert ha.commands == [('shutdown', None)]

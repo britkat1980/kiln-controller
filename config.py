@@ -358,6 +358,14 @@ alert_webhook_timeout = 10 # seconds before giving up on a webhook post
 # The state file is written to disk every sensor_time_wait seconds (2s by default)
 # and is written in the same directory as config.py.
 automatic_restarts = True
+
+# let home assistant power the computer off with the "Shutdown Pi" button
+# (mqtt_ha_discovery), so the kiln's power can then be cut without
+# corrupting the sd card. it only acts while the kiln is idle, never in a
+# simulation, and needs the service to run as root (or passwordless
+# sudo). docs/home-assistant.md has a script that shuts down, waits and
+# then switches the kiln's socket off.
+allow_remote_shutdown = False
 automatic_restart_window = 15 # max minutes since power outage
 automatic_restart_save_interval = 30 # seconds between restart-state saves while firing (each one is an sd card fsync)
 automatic_restart_state_file = os.path.abspath(os.path.join(os.path.dirname( __file__ ),'state.json'))

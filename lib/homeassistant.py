@@ -24,8 +24,12 @@ COMMANDS = {
     'Resume_Program': 'resume',
     'Stop_Program': 'stop',
     'Restart_Controller': 'restart',
+    'Shutdown_Pi': 'shutdown',
     'profiles': 'run',
 }
+
+# entities only announced when a config setting turns their feature on
+OPTIONAL_ENTITIES = {'Shutdown_Pi': 'allow_remote_shutdown'}
 
 # the select's "nothing chosen" option. choosing it does nothing.
 NO_PROFILE = 'None'
@@ -56,6 +60,8 @@ ENTITIES = {
     'Pause_Program': ('button', '', '', False, ''),
     'Stop_Program': ('button', '', '', False, ''),
     'Restart_Controller': ('button', '', '', False, ''),
+    # powers the computer off (idle only), so the kiln's power can be cut
+    'Shutdown_Pi': ('button', '', '', False, 'mdi:power'),
     # pidstats
     'time': ('sensor', 'timestamp', 'PID Time', True, 'mdi:clock-outline'),
     'timedelta': ('sensor', '', 'PID Time Delta', True, 'mdi:timer-sand'),
@@ -206,6 +212,9 @@ class HomeAssistant(object):
         unit = '°F' if config.temp_scale.lower() == 'f' else '°C'
         out = []
         for key, (component, kind, friendly, is_pid, icon) in ENTITIES.items():
+            if key in OPTIONAL_ENTITIES and \
+                    not getattr(config, OPTIONAL_ENTITIES[key], False):
+                continue
             ident = friendly.replace(' ', '_') if friendly else key
             cfg = {
                 'name': friendly or key.replace('_', ' '),

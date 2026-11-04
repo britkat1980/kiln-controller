@@ -2364,3 +2364,54 @@ def test_running_schedule_in_display_scale(monkeypatch):
     assert controller.running_schedule() == [(0, 68.0), (3600, 1832.0)]
     monkeypatch.setattr(controller.oven, 'profile', None)
     assert controller.running_schedule() is None
+
+
+@pytest.fixture
+def shutdown_ready(monkeypatch):
+    '''allow_remote_shutdown on, a real (not simulated) idle kiln, and
+    threads/subprocess recorded instead of run'''
+    monkeypatch.setattr(controller.config, 'allow_remote_shutdown', True, raising=False)
+    monkeypatch.setattr(controller.config, 'simulate', False)
+    monkeypatch.setattr(controller.oven, 'state', 'IDLE')
+    started = []
+    monkeypatch.setattr(controller.threading, 'Thread',
+                        lambda target, daemon=None: types.SimpleNamespace(
+                            start=lambda: started.append(target)))
+    ran = []
+    monkeypatch.setattr(controller.subprocess, 'run',
+                        lambda cmd, **kw: ran.append(cmd) or types.SimpleNamespace(returncode=0))
+    monkeypatch.setattr(controller.time, 'sleep', lambda s: None)
+    return started, ran
+
+
+def test_shutdown_powers_off_when_idle(shutdown_ready):
+    started, ran = shutdown_ready
+    assert controller.remote_command('shutdown') == (True, None)
+    assert len(started) == 1
+    started[0]()
+    assert ran and ran[0][-2:] == ['systemctl', 'poweroff']
+
+
+def test_shutdown_refused_unless_enabled(shutdown_ready, monkeypatch):
+    started, ran = shutdown_ready
+    monkeypatch.setattr(controller.config, 'allow_remote_shutdown', False)
+    ok, error = controller.remote_command('shutdown')
+    assert ok is False and 'allow_remote_shutdown' in error
+    assert started == []
+
+
+def test_shutdown_refused_in_simulation(shutdown_ready, monkeypatch):
+    started, ran = shutdown_ready
+    monkeypatch.setattr(controller.config, 'simulate', True)
+    ok, error = controller.remote_command('shutdown')
+    assert ok is False and 'simulation' in error
+    assert started == []
+
+
+@pytest.mark.parametrize('state', ['RUNNING', 'PAUSED', 'TUNING'])
+def test_shutdown_refused_unless_idle(shutdown_ready, monkeypatch, state):
+    started, ran = shutdown_ready
+    monkeypatch.setattr(controller.oven, 'state', state)
+    ok, error = controller.remote_command('shutdown')
+    assert ok is False and state in error
+    assert started == []

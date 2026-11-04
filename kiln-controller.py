@@ -1377,6 +1377,34 @@ def restart_controller(delay=1):
     log.info("process restart scheduled")
     return True, None
 
+def shutdown_host(delay=1):
+    '''power the computer off, so home assistant can then cut the kiln's
+    power without corrupting the sd card. only with allow_remote_shutdown
+    on, never in a simulation (it would power off the machine running
+    it), and only while the kiln is idle. returns (ok, error)'''
+    if not getattr(config, 'allow_remote_shutdown', False):
+        return False, "remote shutdown is off (allow_remote_shutdown in config)"
+    if config.simulate:
+        return False, "refusing to shut down the computer in a simulation"
+    if oven.state != 'IDLE':
+        return False, "refusing to shut down, oven state is %s" % oven.state
+    command = ['systemctl', 'poweroff']
+    if hasattr(os, 'geteuid') and os.geteuid() != 0:
+        command = ['sudo', '-n'] + command
+    def _do_shutdown():
+        time.sleep(delay)
+        log.info("shutting down the computer now: %s" % ' '.join(command))
+        try:
+            result = subprocess.run(command, capture_output=True, text=True)
+            if result.returncode:
+                log.error("shutdown failed (%s): %s" % (result.returncode,
+                          (result.stderr or result.stdout).strip()))
+        except Exception as e:
+            log.error("shutdown failed: %s" % e)
+    threading.Thread(target=_do_shutdown, daemon=True).start()
+    log.info("computer shutdown scheduled")
+    return True, None
+
 def remote_command(command, argument=None):
     '''commands from home assistant over mqtt. runs on the mqtt network
     thread. returns (ok, error)'''
@@ -1395,6 +1423,8 @@ def remote_command(command, argument=None):
         return True, None
     if command == 'restart':
         return restart_controller()
+    if command == 'shutdown':
+        return shutdown_host()
     return False, "unknown command %s" % command
 
 def profile_names():
