@@ -515,6 +515,53 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+   Schedule preview modal
+--------------------------------------------------------------------------- */
+
+.preview-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.preview-summary strong {
+    color: var(--fg);
+    font-size: 15px;
+}
+
+.preview-graph {
+    position: relative;
+    width: 100%;
+    height: clamp(220px, 40vh, 360px);
+}
+
+.preview-segments {
+    width: 100%;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.preview-segments th,
+.preview-segments td {
+    padding: 3px 8px;
+    border-bottom: 1px solid var(--panel-border);
+    text-align: right;
+}
+
+.preview-segments th:first-child,
+.preview-segments td:first-child {
+    text-align: left;
+}
+
+.preview-segments th {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
    Tuning: stat boxes
 --------------------------------------------------------------------------- */
 
