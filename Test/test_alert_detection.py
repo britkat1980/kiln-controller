@@ -678,3 +678,116 @@ def test_end_of_run_always_saves(fake_clock, counted_saves):
     oven.save_automatic_restart_state()
     oven.abort_run(reason=END_STOPPED)
     assert counted_saves[-1] == 'IDLE'
+
+
+import lib.oven as oven_module  # noqa: E402
+
+
+########################################################################
+# stale (frozen) temperature reading
+########################################################################
+
+class ShortingSensor(oven_module.TempSensorReal):
+    '''a real TempSensorReal without spi, whose thermocouple can be made
+    to fail the way the MAX31855 did on 2026-11-08'''
+    uses_spi = False
+
+    def __init__(self):
+        oven_module.TempSensorReal.__init__(self)
+        self.reading = 103.5
+        self.shorted = False
+
+    def raw_temp(self):
+        if self.shorted:
+            raise oven_module.Max31855_Error("short circuit to ground")
+        return self.reading
+
+
+class StaleSensor(FakeTempSensor):
+    def __init__(self, temp, stale):
+        FakeTempSensor.__init__(self, temp)
+        self.stale = stale
+
+    def seconds_since_valid_reading(self):
+        return self.stale
+
+
+def test_ignored_short_freezes_temperature_but_ages(fake_clock, monkeypatch):
+    '''the 2026-11-08 failure: with ignore_tc_short_errors on, every read
+    failed yet temperature() kept returning the last good value and the
+    error rate stayed at zero. the reading's age is what gives it away.'''
+    monkeypatch.setattr(config, 'ignore_tc_short_errors', True)
+    sensor = ShortingSensor()
+    sensor.read_once()
+    assert sensor.temperature() == 103.5
+    assert sensor.seconds_since_valid_reading() == 0
+
+    sensor.shorted = True
+    for _ in range(200):  # 100 seconds of failed reads
+        fake_clock.advance(0.5)
+        sensor.read_once()
+    assert sensor.temperature() == 103.5             # frozen
+    assert sensor.status.error_percent() == 0        # looks healthy
+    assert sensor.seconds_since_valid_reading() == 100
+
+    sensor.shorted = False
+    sensor.read_once()
+    assert sensor.seconds_since_valid_reading() == 0
+
+
+def test_zero_degree_reading_counts_as_valid(fake_clock):
+    sensor = ShortingSensor()
+    sensor.reading = 0.0
+    fake_clock.advance(30)
+    sensor.read_once()
+    assert sensor.seconds_since_valid_reading() == 0
+    assert sensor.temperature() == 0.0
+
+
+@pytest.mark.parametrize('state', ['RUNNING', 'PAUSED'])
+def test_stale_reading_stops_the_firing(no_restart_writes, monkeypatch, state):
+    monkeypatch.setattr(config, 'tc_stale_reading_limit', 60)
+    # ignore flags must not matter: this check exists for when they are on
+    monkeypatch.setattr(config, 'ignore_tc_too_many_errors', True)
+    oven, _, sink = make_oven(temp_c=to_c(500))
+    oven.run_profile(fast_profile(), allow_seek=False)
+    oven.state = state
+    oven.board.temp_sensor = StaleSensor(103.5, stale=61)
+    oven.reset_if_emergency()
+    assert oven.state == 'IDLE'
+    failures = [c for c in sink.calls if c[0] == 'tc_failure']
+    assert failures and failures[0][3]['stale_seconds'] == 61
+    assert any(c[0] == 'run_aborted' and c[3]['reason'] == 'no valid temperature reading'
+               for c in sink.calls)
+
+
+def test_brief_dropout_keeps_firing(no_restart_writes, monkeypatch):
+    monkeypatch.setattr(config, 'tc_stale_reading_limit', 60)
+    oven, _, sink = make_oven(temp_c=to_c(500))
+    oven.run_profile(fast_profile(), allow_seek=False)
+    oven.board.temp_sensor = StaleSensor(500, stale=20)
+    oven.reset_if_emergency()
+    assert oven.state == 'RUNNING'
+    assert not [c for c in sink.calls if c[0] == 'tc_failure']
+
+
+def test_stale_reading_ignored_when_idle(no_restart_writes, monkeypatch):
+    oven, _, sink = make_oven(temp_c=20)
+    oven.board.temp_sensor = StaleSensor(20, stale=3600)
+    oven.reset_if_emergency()
+    assert oven.state == 'IDLE'
+    assert not [c for c in sink.calls if c[0] == 'tc_failure']
+
+
+def test_stale_limit_zero_disables(no_restart_writes, monkeypatch):
+    monkeypatch.setattr(config, 'tc_stale_reading_limit', 0)
+    oven, _, sink = make_oven(temp_c=to_c(500))
+    oven.run_profile(fast_profile(), allow_seek=False)
+    oven.board.temp_sensor = StaleSensor(500, stale=3600)
+    oven.reset_if_emergency()
+    assert oven.state == 'RUNNING'
+
+
+def test_simulated_sensor_never_stale():
+    sensor = oven_module.TempSensorSimulated()
+    assert sensor.seconds_since_valid_reading() == 0.0

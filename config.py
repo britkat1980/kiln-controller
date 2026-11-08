@@ -325,9 +325,17 @@ ignore_tc_voltage_error = False
 ignore_tc_short_errors = False 
 ignore_tc_unknown_error = False
 
-# This overrides all possible thermocouple errors and prevents the 
+# This overrides all possible thermocouple errors and prevents the
 # process from exiting.
 ignore_tc_too_many_errors = False
+
+# A firing is stopped if no valid temperature has been read for this many
+# seconds, whatever the ignore_* settings above say. An ignored error keeps
+# the last good reading on display, so without this a thermocouple that
+# fails outright would leave the controller heating against a frozen
+# temperature. Brief glitches are still ignored. Applies to RUNNING and
+# PAUSED firings.
+tc_stale_reading_limit = 60 # seconds
 
 ########################################################################
 # alerts - detection thresholds for the web-configurable alert system

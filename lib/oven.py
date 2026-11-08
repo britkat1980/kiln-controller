@@ -117,6 +117,15 @@ class TempSensor(threading.Thread):
         self.daemon = True
         self.time_step = config.sensor_time_wait
         self.status = ThermocoupleTracker()
+        # when the last valid temperature was read. starts now, so a
+        # sensor that never reads counts as stale after the limit
+        self.last_valid_time = time.time()
+
+    def seconds_since_valid_reading(self):
+        '''seconds since the sensor last produced a valid temperature.
+        ignored errors keep temperature() at the last good value, so this
+        is how the oven tells a frozen reading from a steady kiln.'''
+        return max(0.0, time.time() - self.last_valid_time)
 
 class TempSensorSimulated(TempSensor):
     '''Simulates a temperature sensor '''
@@ -125,6 +134,8 @@ class TempSensorSimulated(TempSensor):
         self.simulated_temperature = to_c(config.sim_t_env)
     def temperature(self):
         return self.simulated_temperature
+    def seconds_since_valid_reading(self):
+        return 0.0
 
 class TempSensorReal(TempSensor):
     '''real temperature sensor that takes many measurements
@@ -184,11 +195,15 @@ class TempSensorReal(TempSensor):
         '''average temp over a duty cycle'''
         return self.temptracker.get_avg_temp()
 
+    def read_once(self):
+        temp = self.get_temperature()
+        if temp is not None:
+            self.temptracker.add(temp)
+            self.last_valid_time = time.time()
+
     def run(self):
         while True:
-            temp = self.get_temperature()
-            if temp:
-                self.temptracker.add(temp)
+            self.read_once()
             time.sleep(self.sleeptime)
 
 class TempTracker(object):
@@ -680,6 +695,21 @@ class Oven(threading.Thread):
             self._emit('tc_failure', error_percent=error_percent)
             if config.ignore_tc_too_many_errors == False:
                 self.abort_run(reason='too many thermocouple errors')
+
+        # a frozen reading: the sensor has produced nothing valid for too
+        # long. deliberately not subject to any ignore_* setting, as
+        # heating against a stale temperature has no feedback at all.
+        limit = getattr(config, 'tc_stale_reading_limit', 60)
+        sensor = getattr(self.board, 'temp_sensor', None)
+        if limit and self.state in ('RUNNING', 'PAUSED') and \
+                hasattr(sensor, 'seconds_since_valid_reading'):
+            stale = sensor.seconds_since_valid_reading()
+            if stale > limit:
+                log.error("emergency!!! no valid temperature reading for %d seconds" % stale)
+                self._emit('tc_failure', error_percent=None,
+                           stale_seconds=round(stale))
+                self.abort_run(reason='no valid temperature reading')
+                return
 
         self.check_heat_rate_emergency()
 
