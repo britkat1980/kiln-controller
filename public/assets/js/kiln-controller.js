@@ -1966,7 +1966,8 @@ function drawPreviewChart(pts) {
         preview_chart.destroy();
         preview_chart = null;
     }
-    var tc = themeColors();
+    // modals stay light in both themes, so always the light-theme axes
+    var tc = { axis: 'rgba(40,38,34,0.75)', grid: 'rgba(40,38,34,0.14)' };
     var maxX = pts.length ? pts[pts.length - 1][0] : 0;
     var maxY = pts.reduce(function(m, p) { return Math.max(m, p[1]); }, 0);
     var xs = axisStep(maxX);
