@@ -167,6 +167,28 @@ modbus_fault_values = []
 modbus_status_register = 11
 modbus_status_open_bits = [12]   # Z-4TC input 1 burn-out
 modbus_status_error_bits = [8]   # Z-4TC input 1 acquisition error
+# int only: multiply the raw reading by this instead of using
+# modbus_decimal, for modules that scale readings across their range.
+modbus_scale = None
+# a discrete input (read with function 2) that is 1 when the thermocouple
+# is burnt out / open. raises "not connected". None skips it.
+modbus_burnout_input = None
+# configuration registers the module must hold, as {register: value}.
+# checked on the first read and written (function 6) where they differ,
+# then readings wait modbus_setup_wait seconds while it recalibrates.
+modbus_setup_registers = {}
+modbus_setup_wait = 7
+#
+# an Advantech ADAM-4018+ (set to Modbus with Advantech's utility first),
+# thermocouple on channel 0 (ADAM-4000 manual, appendices B and G):
+#   modbus_baudrate = 9600
+#   modbus_registernumber = 0           # 40001: channel 0
+#   modbus_signed = True
+#   modbus_scale = 1370 / 32767         # type K: 0x7fff = 1370C
+#   modbus_status_register = None
+#   modbus_burnout_input = 200          # 00201: channel 0 burn-out
+#   modbus_setup_registers = {200: 0x0F,   # 40201: channel 0 type K
+#                             220: 0x01}   # 40221: only channel 0 enabled
 
 ########################################################################
 #

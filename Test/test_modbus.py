@@ -25,6 +25,8 @@ class FakeInstrument:
         self.float_value = 0.0
         self.error = None
         self.calls = []
+        self.holding = {}
+        self.bits = {}
         FakeInstrument.instances.append(self)
 
     def read_register(self, register, decimals, functioncode=3, signed=False):
@@ -33,10 +35,27 @@ class FakeInstrument:
             if self.error:
                 raise self.error
             return self.status_value
+        if register in self.holding:
+            self.calls.append(('read', register, functioncode))
+            if self.error:
+                raise self.error
+            return self.holding[register]
         self.calls.append(('register', register, decimals, functioncode, signed))
         if self.error:
             raise self.error
         return self.register_value
+
+    def write_register(self, register, value, decimals=0, functioncode=16, signed=False):
+        self.calls.append(('write', register, value, functioncode))
+        if self.error:
+            raise self.error
+        self.holding[register] = value
+
+    def read_bit(self, address, functioncode=2):
+        self.calls.append(('bit', address, functioncode))
+        if self.error:
+            raise self.error
+        return self.bits.get(address, 0)
 
     def read_float(self, register, functioncode=3, number_of_registers=2, byteorder=0):
         self.calls.append(('float', register, functioncode, byteorder))
@@ -238,6 +257,103 @@ def test_status_read_failure_is_comms_error(z4tc):
 
 
 def test_no_status_read_when_disabled(modbus):
+    sensor, inst = modbus()
+    inst.register_value = 100
+    sensor.raw_temp()
+    assert [c[0] for c in inst.calls] == ['register']
+
+
+@pytest.fixture
+def adam(modbus, monkeypatch):
+    '''Advantech ADAM-4018+, type K thermocouple on channel 0, with the
+    settings from the config.py example'''
+    sleeps = []
+    monkeypatch.setattr(oven.time, 'sleep', lambda s: sleeps.append(s))
+    for key, value in dict(modbus_baudrate=9600, modbus_registernumber=0,
+                           modbus_signed=True, modbus_scale=1370 / 32767,
+                           modbus_fault_values=[],
+                           modbus_status_register=None,
+                           modbus_burnout_input=200,
+                           modbus_setup_registers={200: 0x0F, 220: 0x01},
+                           modbus_setup_wait=7).items():
+        monkeypatch.setattr(config, key, value, raising=False)
+
+    def make(holding=None):
+        sensor, inst = modbus()
+        # factory defaults: channel 0 type J, all channels enabled
+        inst.holding.update(holding if holding is not None else {200: 0x0E, 220: 0xFF})
+        return sensor, inst, sleeps
+    return make
+
+
+def test_adam_full_scale_is_1370(adam):
+    sensor, inst, _ = adam()
+    inst.register_value = 32767
+    assert sensor.raw_temp() == pytest.approx(1370.0)
+    inst.register_value = 2392            # boiling water
+    assert sensor.raw_temp() == pytest.approx(100.0, abs=0.05)
+    inst.register_value = 0
+    assert sensor.raw_temp() == 0
+
+
+def test_adam_reading_uses_holding_register_0(adam):
+    sensor, inst, _ = adam()
+    inst.register_value = 29193
+    sensor.raw_temp()
+    assert inst.calls[-1] == ('register', 0, 0, 3, True)
+
+
+def test_adam_setup_writes_type_k_and_channel_mask_once(adam):
+    sensor, inst, sleeps = adam()
+    inst.register_value = 512
+    sensor.raw_temp()
+    writes = [c for c in inst.calls if c[0] == 'write']
+    assert writes == [('write', 200, 0x0F, 6), ('write', 220, 0x01, 6)]
+    assert sleeps == [7]
+    inst.calls.clear()
+    sensor.raw_temp()
+    assert [c[0] for c in inst.calls] == ['bit', 'register']
+    assert sleeps == [7]
+
+
+def test_adam_already_configured_is_not_rewritten(adam):
+    sensor, inst, sleeps = adam(holding={200: 0x0F, 220: 0x01})
+    inst.register_value = 512
+    sensor.raw_temp()
+    assert not [c for c in inst.calls if c[0] == 'write']
+    assert sleeps == []
+
+
+def test_adam_setup_retried_after_comms_failure(adam):
+    '''a module that is off at start-up is configured once it answers'''
+    sensor, inst, _ = adam()
+    inst.error = NoResponseError("no answer")
+    with pytest.raises(Modbus_Error) as exc:
+        sensor.raw_temp()
+    assert exc.value.message == 'unknown'
+    inst.error = None
+    inst.register_value = 512
+    sensor.raw_temp()
+    assert inst.holding == {200: 0x0F, 220: 0x01}
+
+
+def test_adam_burnout_is_not_connected(adam):
+    sensor, inst, _ = adam(holding={200: 0x0F, 220: 0x01})
+    inst.bits[200] = 1
+    with pytest.raises(Modbus_Error) as exc:
+        sensor.raw_temp()
+    assert exc.value.message == 'not connected'
+    assert ('bit', 200, 2) in inst.calls
+
+
+def test_adam_burnout_counted_by_tracker(adam):
+    sensor, inst, _ = adam(holding={200: 0x0F, 220: 0x01})
+    inst.bits[200] = 1
+    assert sensor.get_temperature() is None
+    assert sensor.status.error_percent() > 0
+
+
+def test_no_setup_or_burnout_calls_by_default(modbus):
     sensor, inst = modbus()
     inst.register_value = 100
     sensor.raw_temp()

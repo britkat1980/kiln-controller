@@ -401,6 +401,20 @@ class Modbus(TempSensorReal):
         self.status_register = getattr(config, 'modbus_status_register', None)
         self.status_open_bits = getattr(config, 'modbus_status_open_bits', [])
         self.status_error_bits = getattr(config, 'modbus_status_error_bits', [])
+        # optional multiplier for int readings, e.g. 1370/32767 for an
+        # ADAM-4018+ type K channel (full scale 0x7fff = 1370C). replaces
+        # modbus_decimal when set
+        self.scale = getattr(config, 'modbus_scale', None)
+        # optional discrete input (function 2) that is 1 when the
+        # thermocouple is burnt out / open, e.g. the ADAM-4018+'s 00201
+        self.burnout_input = getattr(config, 'modbus_burnout_input', None)
+        # {register: value} the module must hold, e.g. the thermocouple
+        # type code. checked once, on the first read, and written (function
+        # 6) where they differ, then reads wait modbus_setup_wait seconds
+        # while the module recalibrates
+        self.setup_registers = dict(getattr(config, 'modbus_setup_registers', {}) or {})
+        self.setup_wait = getattr(config, 'modbus_setup_wait', 7)
+        self.setup_done = not self.setup_registers
 
         self.instrument = minimalmodbus.Instrument(port, slave)
         serial = self.instrument.serial
@@ -409,6 +423,33 @@ class Modbus(TempSensorReal):
         serial.stopbits = getattr(config, 'modbus_stopbits', 1)
         serial.timeout = getattr(config, 'modbus_timeout', 0.5)
         self.instrument.clear_buffers_before_each_transaction = True
+
+    def apply_setup(self):
+        '''make the module's configuration registers match
+        modbus_setup_registers. runs on the first read rather than in
+        __init__, so a module that is off or unplugged at start-up shows
+        as thermocouple errors instead of stopping the controller'''
+        changed = []
+        for register, value in sorted(self.setup_registers.items()):
+            current = self.instrument.read_register(register, 0, functioncode=3)
+            if current != value:
+                self.instrument.write_register(register, value, 0, functioncode=6)
+                changed.append("%s: 0x%04x -> 0x%04x" % (register, current, value))
+        if changed:
+            log.warning("thermocouple modbus: configured module (%s), "
+                        "waiting %ss for it to recalibrate" % (
+                            ", ".join(changed), self.setup_wait))
+            time.sleep(self.setup_wait)
+        else:
+            log.info("thermocouple modbus: module configuration ok")
+        self.setup_done = True
+
+    def check_burnout(self):
+        if self.burnout_input is None:
+            return
+        if self.instrument.read_bit(self.burnout_input, functioncode=2):
+            raise Modbus_Error("burn-out input %s set" % self.burnout_input,
+                               kind='fault')
 
     def check_status(self):
         if self.status_register is None:
@@ -426,7 +467,10 @@ class Modbus(TempSensorReal):
 
     def raw_temp(self):
         try:
+            if not self.setup_done:
+                self.apply_setup()
             self.check_status()
+            self.check_burnout()
             if self.format == 'float':
                 value = self.instrument.read_float(
                     self.register, functioncode=self.functioncode,
@@ -436,7 +480,10 @@ class Modbus(TempSensorReal):
                 raw = self.instrument.read_register(
                     self.register, 0, functioncode=self.functioncode,
                     signed=self.signed)
-                value = raw / (10 ** self.decimals)
+                if self.scale is not None:
+                    value = raw * self.scale
+                else:
+                    value = raw / (10 ** self.decimals)
         except (OSError, ValueError) as e:
             # minimalmodbus.ModbusException and serial.SerialException
             # are both OSErrors; ValueError covers malformed replies
