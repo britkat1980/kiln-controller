@@ -716,6 +716,14 @@ function setEditMode(on) {
         }
     }
 
+    // heat-work of the current or last firing as an orton cone ("5.4"),
+    // or '--' before anything has got hot enough to count
+    function updateOverviewCone(cone)
+    {
+        var c = document.getElementById('overview_cone');
+        if (c) { c.textContent = cone ? cone : '--'; }
+    }
+
    function adoptProfile(name)
    {
        if (!name) { return; }
@@ -2686,6 +2694,9 @@ function init()
         }
         if (_ovTemp !== undefined || _ovTarget !== undefined) {
             updateOverviewTemps(_ovTemp, _ovTarget);
+        }
+        if (x.cone !== undefined) {
+            updateOverviewCone(x.cone);
         }
 
         // tuning feed

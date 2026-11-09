@@ -55,6 +55,11 @@ ENTITIES = {
     # state is the running profile, attributes the whole schedule (see
     # schedule_attributes) so a dashboard can draw it ahead of time
     'schedule': ('sensor', '', 'Schedule', False, 'mdi:chart-line'),
+    # heat-work of the current or last firing (lib/heatwork.py): the cone
+    # as text ("5.4", "04+30%") and as a number for graphs (cone 1 = 1,
+    # cone 01 = 0, cone 02 = -1, ...)
+    'cone': ('sensor', '', 'Cone Equivalent', False, 'mdi:triangle-outline'),
+    'cone_number': ('sensor', 'measurement', 'Cone Number', False, 'mdi:triangle-outline'),
     'profiles': ('select', '', '', False, ''),
     'Resume_Program': ('button', '', '', False, ''),
     'Pause_Program': ('button', '', '', False, ''),
@@ -81,6 +86,10 @@ ENTITIES = {
 
 # pidstats keys whose topic name differs from the pid's own key
 PIDSTAT_TOPICS = {'timeDelta': 'timedelta'}
+
+# position of cone 1 in heatwork.CONE_MODELS, so cone_number is the
+# cone's own number from cone 1 up
+CONE_ONE_INDEX = 22
 
 # discovery topics are <prefix>/<component>/<NODE_ID>/<key>/config
 NODE_ID = 'kiln_controller'
@@ -250,6 +259,8 @@ class HomeAssistant(object):
                 cfg['device_class'] = 'timestamp'
             elif kind == 'percent':
                 cfg['unit_of_meas'] = '%'
+            elif kind == 'measurement':
+                cfg['state_class'] = 'measurement'
             topic = '%s/%s/%s/%s/config' % (self.prefix, component, NODE_ID, key)
             out.append((topic, json.dumps(cfg)))
         return out
@@ -278,6 +289,9 @@ class HomeAssistant(object):
         msgs.append(('totaltime', format_duration(state.get('totaltime'))))
         msgs.append(('profile', state.get('profile') or NO_PROFILE))
         msgs.append(('name', self.base))
+        msgs.append(('cone', state.get('cone') or NO_PROFILE))
+        index = state.get('cone_index')
+        msgs.append(('cone_number', NO_PROFILE if index is None else round(index - CONE_ONE_INDEX + 1, 2)))
 
         running = state.get('state') in ('RUNNING', 'PAUSED')
         totaltime = state.get('totaltime') or 0

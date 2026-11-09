@@ -38,6 +38,7 @@ sys.path.insert(0, script_dir + '/lib/')
 profile_path = config.kiln_profiles_directory
 
 from temp import f_to_c, c_to_f, to_c, to_display
+import heatwork
 from oven import SimulatedOven, RealOven, Profile
 from ovenWatcher import OvenWatcher
 from scheduler import Scheduler
@@ -1056,6 +1057,7 @@ def api_firing_detail(fid):
                   "start": _wall_to_stamp(first) if first else '',
                   "end": _wall_to_stamp(last) if last else '',
                   "duration": duration, "samples": len(samples)}
+        firing.update(heatwork.recorded_firing_cone(samples, config.temp_scale))
         return json.dumps({"success": True, "firing": firing,
                            "samples": samples})
     except bottle.HTTPResponse:

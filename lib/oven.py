@@ -9,6 +9,7 @@ import digitalio
 import adafruit_bitbangio as bitbangio
 import statistics
 from temp import to_c, to_display, delta_to_c, delta_to_display, display_pidstats, corrected_temp
+from heatwork import HeatWork
 
 log = logging.getLogger(__name__)
 
@@ -495,6 +496,11 @@ class Oven(threading.Thread):
         # when and in which state the restart file was last written
         self.last_save_time = None
         self.last_saved_state = None
+        # heat-work (equivalent cone) of the current or last firing. kept
+        # across reset() so the cool-down still counts after a run ends;
+        # a new run starts it again.
+        self.heat_work = HeatWork()
+        self.heat_work_time = None
         self.reset()
         # each firing gets an increasing run_sequence. ended_run_sequence
         # remembers the highest sequence that has finished so scheduled
@@ -573,6 +579,8 @@ class Oven(threading.Thread):
         # a new firing invalidates any cooled_safe alert armed by the
         # previous one: the kiln is about to get hot again
         self.cooled_safe_armed_for = None
+        self.heat_work.reset()
+        self.heat_work_time = None
         log.info("Running schedule %s starting at %d minutes" % (profile.name,startat))
         log.info("Starting")
 
@@ -934,6 +942,9 @@ class Oven(threading.Thread):
             'catching_up': self.catching_up,
             'temp_errors': temp_errors,
         }
+        cone_index, cone = self.heat_work.equivalent()
+        state['cone_index'] = None if cone_index is None else round(cone_index, 2)
+        state['cone'] = cone
         return state
 
     def get_display_pidstats(self):
@@ -962,6 +973,7 @@ class Oven(threading.Thread):
         except Exception:
             state['run_started'] = None
         state['ended_run_sequence'] = self.ended_run_sequence
+        state['heat_work'] = self.heat_work.to_list()
         # embed the full profile so a restart does not depend on the
         # profile file still being on disk under "<name>.json": runs
         # started from the ui without saving (or renamed/deleted
@@ -1161,6 +1173,7 @@ class Oven(threading.Thread):
             self.cost = float(d.get("cost", 0) or 0)
         except (TypeError, ValueError):
             self.cost = 0
+        self.heat_work.restore(d.get("heat_work"))
         time.sleep(1)
         # the control thread starts before the watcher is attached at
         # boot; a missing watcher must not fail the restart (the
@@ -1248,8 +1261,31 @@ class Oven(threading.Thread):
                               "error: %s" % (abort_error))
                 time.sleep(1)
 
+    def update_heat_work(self):
+        '''add the time since the last call at the current temperature to
+        the heat-work. runs in every state, so the cool-down after a
+        firing counts too. stale readings (a failing thermocouple) are
+        left out rather than counted at a frozen temperature.
+        it is only a figure for display, so it must never get in the way
+        of controlling the kiln: any error is logged and swallowed.'''
+        try:
+            now = time.time()
+            last, self.heat_work_time = self.heat_work_time, now
+            if last is None:
+                return
+            sensor = getattr(getattr(self, 'board', None), 'temp_sensor', None)
+            stale = getattr(sensor, 'seconds_since_valid_reading', None)
+            if stale is not None and stale() > 30:
+                return
+            temp = self._current_temp()
+            # a long gap is a stall or a restart, not time at temperature
+            self.heat_work.add(temp, min(now - last, 60.0))
+        except Exception:
+            log.exception("heat-work update failed")
+
     def _run_once(self):
         log.debug('Oven running on ' + threading.current_thread().name)
+        self.update_heat_work()
         if self.state == "IDLE":
             if not self.restart_outage_checked:
                 self.restart_outage_checked = True
