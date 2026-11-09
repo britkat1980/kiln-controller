@@ -2176,7 +2176,14 @@ function create_charts() {
   charts.heat.data.datasets = [line_dataset('heat', '#ffb14e')];
 
   charts.heatrate = make_line_chart('chart-heat-rate');
-  charts.heatrate.data.datasets = [line_dataset('heat rate', '#ffb14e')];
+  var raw = line_dataset('raw', 'rgba(255,177,78,0.35)');
+  raw.borderWidth = 1;
+  raw.hidden = true;  // click the legend to show it
+  charts.heatrate.data.datasets = [
+    line_dataset('actual', '#ffb14e'),
+    line_dataset('schedule', '#9cb310'),
+    raw
+  ];
 
   charts.p = make_line_chart('chart-p');
   charts.p.data.datasets = [line_dataset('p', '#6ec6ff')];
@@ -2272,9 +2279,58 @@ function draw_heat(data) {
   set_chart_data(charts.heat, data, 'out');
 }
 
+// smoothed rate in degrees/hour: at each sample, the slope of a least
+// squares straight line through the samples of the last windowSecs. the
+// temperature moves in ~0.25 degree steps every few seconds, so the
+// sample-to-sample rate jumps by hundreds of degrees/hour; a fit over
+// minutes shows the real ramp. a gap over RATE_MAX_GAP restarts the
+// window. points are only drawn once the window holds at least half of
+// windowSecs, so the start of a firing does not show a noisy fit.
+function smoothed_rate_series(data, field, windowSecs) {
+  var out = [];
+  var start = 0;
+  var n = 0, st = 0, sy = 0, stt = 0, sty = 0;
+  var t0 = data.length ? data[0].time : 0;  // keeps the sums well scaled
+  function addRow(row, sign) {
+    var t = row.time - t0, y = row[field];
+    n += sign; st += sign * t; sy += sign * y;
+    stt += sign * t * t; sty += sign * t * y;
+  }
+  for (var i = 0; i < data.length; i++) {
+    var y = data[i][field];
+    if (y === null || y === undefined || isNaN(y)) { continue; }
+    if (i > 0 && data[i].time - data[i - 1].time > RATE_MAX_GAP) {
+      n = st = sy = stt = sty = 0;
+      start = i;
+    }
+    addRow(data[i], 1);
+    while (start < i && data[start].time < data[i].time - windowSecs) {
+      var old = data[start][field];
+      if (old !== null && old !== undefined && !isNaN(old)) { addRow(data[start], -1); }
+      start++;
+    }
+    var span = data[i].time - data[start].time;
+    var den = n * stt - st * st;
+    if (n >= 3 && span >= windowSecs / 2 && den > 0) {
+      var slope = (n * sty - st * sy) / den;  // degrees per second
+      out.push({ x: data[i].time, y: Math.round(slope * 3600) });
+    }
+  }
+  return out;
+}
+
+function heat_rate_window_secs() {
+  var sel = $('heat_rate_window');
+  var minutes = sel ? parseInt(sel.value, 10) : 10;
+  return (isNaN(minutes) || minutes <= 0 ? 10 : minutes) * 60;
+}
+
 function draw_heat_rate(data) {
-  var pts = rate_series(data, 'ispoint');
-  charts.heatrate.data.datasets[0].data = pts;
+  var w = heat_rate_window_secs();
+  var ds = charts.heatrate.data.datasets;
+  ds[0].data = smoothed_rate_series(data, 'ispoint', w);
+  ds[1].data = smoothed_rate_series(data, 'setpoint', w);
+  ds[2].data = rate_series(data, 'ispoint');
   charts.heatrate.update('none');
 }
 

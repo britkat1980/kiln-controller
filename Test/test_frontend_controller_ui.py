@@ -1453,3 +1453,63 @@ def test_preview_modal_markup():
                 'preview_profile_summary', 'preview_profile_segments',
                 'btn_preview_install'):
         assert 'id="%s"' % id_ in html
+
+
+########################################################################
+# heat rate chart smoothing
+########################################################################
+
+@pytest.fixture
+def rate_js():
+    src = open(JS_PATH).read()
+    context = quickjs.Context()
+    context.eval(re.search(r"var RATE_MAX_GAP = \d+;", src).group(0))
+    context.eval(extract_function(src, 'rate_series'))
+    context.eval(extract_function(src, 'smoothed_rate_series'))
+    # a 100 deg/h ramp read every 5s by a sensor with 0.25 deg steps, then
+    # a 30 minute hold
+    context.eval(
+        'var rows = [];'
+        'for (var k = 0; k <= 720; k++) {'
+        '  var t = 1000 + k * 5;'
+        '  var exact = k <= 360 ? 500 + k * 5 * 100 / 3600 : 550;'
+        '  rows.push({ time: t, ispoint: Math.round(exact * 4) / 4, setpoint: exact });'
+        '}')
+    return context
+
+
+def series(js, expr):
+    return json.loads(js.eval('JSON.stringify(%s)' % expr))
+
+
+def test_raw_rate_swings_from_quantisation(rate_js):
+    ys = [p['y'] for p in series(rate_js, 'rate_series(rows, "ispoint")')]
+    assert max(ys) - min(ys) >= 180  # one 0.25 step in 5s is 180 deg/h
+
+
+def test_smoothed_rate_follows_the_ramp_and_hold(rate_js):
+    pts = series(rate_js, 'smoothed_rate_series(rows, "ispoint", 600)')
+    ramp = [p['y'] for p in pts if 1000 + 600 <= p['x'] <= 1000 + 1800]
+    hold = [p['y'] for p in pts if p['x'] >= 1000 + 1800 + 600]
+    assert ramp and all(abs(y - 100) <= 3 for y in ramp)
+    assert hold and all(abs(y) <= 3 for y in hold)
+
+
+def test_schedule_rate_from_setpoint(rate_js):
+    pts = series(rate_js, 'smoothed_rate_series(rows, "setpoint", 600)')
+    assert [p['y'] for p in pts if 1000 + 600 <= p['x'] <= 1000 + 1800] == \
+        [100] * len([p for p in pts if 1000 + 600 <= p['x'] <= 1000 + 1800])
+
+
+def test_smoothing_waits_for_half_a_window(rate_js):
+    pts = series(rate_js, 'smoothed_rate_series(rows, "ispoint", 600)')
+    assert pts[0]['x'] >= 1000 + 300
+
+
+def test_gap_restarts_the_window(rate_js):
+    rate_js.eval('var gapped = rows.slice(0, 200).concat(rows.slice(400).map('
+                 'function(r) { return { time: r.time + 3600, ispoint: r.ispoint }; }));')
+    pts = series(rate_js, 'smoothed_rate_series(gapped, "ispoint", 600)')
+    resume = 1000 + 400 * 5 + 3600
+    after = [p['x'] for p in pts if p['x'] >= resume]
+    assert after and after[0] >= resume + 300

@@ -674,6 +674,22 @@ body {
     height: 240px;
 }
 
+/* smoothing window picker in the heat rate chart's title */
+.chart-title .heat-rate-window {
+    display: inline-block;
+    width: auto;
+    margin-left: 8px;
+    padding: 0 24px 0 6px;
+    font-size: 11px;
+    line-height: 1.6;
+    text-transform: none;
+    letter-spacing: normal;
+    vertical-align: middle;
+    background-color: var(--ds-input-bg);
+    color: var(--ds-input-fg);
+    border-color: var(--ds-input-border);
+}
+
 .window-control {
     display: flex;
     align-items: center;

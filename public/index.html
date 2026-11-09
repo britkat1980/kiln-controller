@@ -331,7 +331,14 @@
      <div class="chart-body"><canvas id="chart-heat"></canvas></div>
     </div>
     <div class="chart-panel">
-     <div class="chart-title">Heat Rate (<span id="heat-rate-units">&deg;C/hr</span>)</div>
+     <div class="chart-title">Heat Rate (<span id="heat-rate-units">&deg;C/hr</span>)
+      <select id="heat_rate_window" class="form-select form-select-sm heat-rate-window" onchange="draw_heat_rate(windowed_data())" title="Smoothing: the rate is the slope of a straight-line fit over this many minutes. Click 'raw' in the legend for the unsmoothed rate.">
+       <option value="5">5 min</option>
+       <option value="10" selected>10 min</option>
+       <option value="20">20 min</option>
+       <option value="30">30 min</option>
+      </select>
+     </div>
      <div class="chart-body"><canvas id="chart-heat-rate"></canvas></div>
     </div>
     <div class="chart-panel">
