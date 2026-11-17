@@ -1688,6 +1688,13 @@ class PID():
         else:
             ki = self.ki if self.ki else 1
             self.iterm += (error * timeDelta * (1/ki))
+            # anti-windup: the output is clamped to +/-window_size, so an
+            # integral beyond that can never help. without this it kept
+            # growing while the elements were flat out on a climb the kiln
+            # could only just manage (430 at the end of a cone 6 firing),
+            # then held the elements on past the target on the hold that
+            # followed until it unwound
+            self.iterm = sorted([-1 * window_size, self.iterm, window_size])[1]
             if timeDelta > 0:
                 dErr = (error - self.lastErr) / timeDelta
             else:

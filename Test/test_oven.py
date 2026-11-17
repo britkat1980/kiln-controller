@@ -231,6 +231,35 @@ def test_pid_never_outputs_negative():
     assert out == 0
 
 
+def test_pid_integral_clamped_to_output_window():
+    '''a climb the elements can only just manage keeps the error positive
+    with the output already at 100%. the integral must stop at the output
+    limit, or it keeps the elements on long past the target afterwards'''
+    pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
+    now = datetime.datetime(2020, 1, 1)
+    pid.lastNow = now
+    for _ in range(2000):                 # ~2.8 h of 5 s steps, 2 below target
+        now += datetime.timedelta(seconds=5)
+        pid.compute(1000, 998, now)
+    assert pid.iterm == 100
+    # reaching the target: the clamped integral unwinds within minutes
+    for _ in range(60):
+        now += datetime.timedelta(seconds=5)
+        pid.compute(1000, 1002, now)
+    assert pid.iterm < 100
+    assert pid.compute(1000, 1002, now + datetime.timedelta(seconds=5)) < 1
+
+
+def test_pid_integral_clamped_below():
+    pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
+    now = datetime.datetime(2020, 1, 1)
+    pid.lastNow = now
+    for _ in range(2000):
+        now += datetime.timedelta(seconds=5)
+        pid.compute(1000, 1002, now)
+    assert pid.iterm == -100
+
+
 def test_pid_time_delta_unaffected_by_dst():
     # PID timeDelta must measure real elapsed time, not naive wall-clock
     # difference. across the spring-forward transition naive subtraction
