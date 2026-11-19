@@ -90,6 +90,12 @@ tuner = Tuner(oven)
 def index():
     return bottle.static_file('index.html', root=public_root)
 
+@app.route('/glance')
+def glance():
+    '''screensaver view: current temperature and time remaining in large
+    type, to read from across the room or on the kiosk screen'''
+    return bottle.static_file('glance.html', root=public_root)
+
 @app.route('/state')
 def state():
     return bottle.redirect('/#details')

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kiln at a Glance</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23201f1c'/%3E%3Cpath d='M8 3c2.5 3 3.5 4.6 3.5 6.2A3.5 3.5 0 0 1 8 12.7a3.5 3.5 0 0 1-3.5-3.5C4.5 7.6 5.5 6 8 3z' fill='%23f2a900'/%3E%3C/svg%3E">
+<style>
+/* a screensaver view: the temperature and the time left, readable from
+   across the room. tap anywhere for the full controller. */
+:root {
+    --bg: #0b0b0c;
+    --text: #e9e6df;
+    --muted: #8a867d;
+    --faint: #3a3833;
+    --cool: #9fb7c9;
+    --warm: #f2a900;
+    --hot: #ff7a1a;
+    --glow: #ff3d2e;
+    --ok: #5fbf77;
+    --bad: #ff5a4f;
+    --temp: var(--cool);
+}
+* { box-sizing: border-box; }
+html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden; cursor: none;
+    -webkit-user-select: none; user-select: none;
+}
+#stage {
+    height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2vh; padding: 4vh 4vw; text-align: center;
+    transition: transform 2s ease, opacity 0.6s ease;
+}
+#status {
+    display: flex; align-items: center; gap: 0.8em;
+    font-size: clamp(14px, 3.2vh, 34px); color: var(--muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+}
+#state { font-weight: 600; color: var(--text); }
+#profile { text-transform: none; letter-spacing: 0; }
+#heat {
+    width: 0.7em; height: 0.7em; border-radius: 50%;
+    background: var(--faint); transition: background 0.3s, box-shadow 0.3s;
+}
+#heat.on { background: var(--glow); box-shadow: 0 0 0.6em var(--glow); }
+#temp {
+    font-size: min(30vh, 24vw); line-height: 0.95; font-weight: 300;
+    font-variant-numeric: tabular-nums; color: var(--temp);
+    transition: color 2s ease;
+}
+#temp .unit { font-size: 0.35em; vertical-align: 0.95em; margin-left: 0.05em; color: var(--muted); }
+#remaining {
+    font-size: min(13vh, 11vw); line-height: 1; font-weight: 400;
+    font-variant-numeric: tabular-nums;
+}
+#remaining-label {
+    font-size: clamp(14px, 3vh, 30px); color: var(--muted);
+    margin-top: -1vh;
+}
+#details {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6em 2.2em;
+    font-size: clamp(13px, 2.8vh, 28px); color: var(--muted);
+    font-variant-numeric: tabular-nums; margin-top: 2vh;
+}
+#details b { color: var(--text); font-weight: 500; }
+#details .hide { display: none; }
+#clock {
+    position: fixed; right: 3vw; bottom: 3vh;
+    font-size: clamp(13px, 2.6vh, 26px); color: var(--faint);
+    font-variant-numeric: tabular-nums;
+}
+#offline {
+    position: fixed; left: 0; right: 0; top: 3vh; display: none;
+    font-size: clamp(14px, 3vh, 30px); color: var(--bad);
+}
+body.stale #stage { opacity: 0.35; }
+body.stale #offline { display: block; }
+.alert #state { color: var(--bad); }
+</style>
+</head>
+<body>
+<div id="offline">Not connected to the kiln controller</div>
+<div id="stage">
+    <div id="status"><span id="heat" title="Elements"></span><span id="state">Connecting</span><span id="profile"></span></div>
+    <div id="temp">--<span class="unit">&deg;C</span></div>
+    <div id="remaining">&nbsp;</div>
+    <div id="remaining-label">&nbsp;</div>
+    <div id="details">
+        <span id="d-target">Target <b id="target">--</b></span>
+        <span id="d-rate">Rate <b id="rate">--</b></span>
+        <span id="d-finish">Finishes <b id="finish">--</b></span>
+        <span id="d-cone">Cone <b id="cone">--</b></span>
+    </div>
+</div>
+<div id="clock"></div>
+<script>
+(function () {
+    var unit = 'C';
+    var lastMessage = 0;
+    var $ = function (id) { return document.getElementById(id); };
+
+    function socketUrl(name) {
+        var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return proto + '//' + location.host + '/' + name;
+    }
+
+    function connect(name, onmessage, onopen) {
+        var delay = 2000;
+        (function open() {
+            var ws = new WebSocket(socketUrl(name));
+            ws.onopen = function () { delay = 2000; if (onopen) onopen(ws); };
+            ws.onmessage = function (e) {
+                try { onmessage(JSON.parse(e.data)); } catch (err) {}
+            };
+            ws.onclose = function () {
+                setTimeout(open, delay);
+                delay = Math.min(delay * 2, 15000);
+            };
+        })();
+    }
+
+    function hhmm(seconds) {
+        seconds = Math.max(0, Math.round(seconds));
+        var h = Math.floor(seconds / 3600);
+        var m = Math.floor((seconds % 3600) / 60);
+        return h + ':' + (m < 10 ? '0' : '') + m;
+    }
+
+    function clockTime(date) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // colour the temperature by how hot the kiln is, in celsius
+    function tempColour(c) {
+        if (c < 60) return 'var(--cool)';
+        if (c < 300) return 'var(--warm)';
+        if (c < 800) return 'var(--hot)';
+        return 'var(--glow)';
+    }
+
+    function show(id, visible) { $(id).classList.toggle('hide', !visible); }
+
+    function render(x) {
+        var temp = x.temperature;
+        if (typeof temp === 'number') {
+            var c = unit === 'F' ? (temp - 32) * 5 / 9 : temp;
+            $('temp').innerHTML = Math.round(temp) + '<span class="unit">&deg;' + unit + '</span>';
+            document.documentElement.style.setProperty('--temp', tempColour(c));
+        }
+
+        var state = x.state || 'IDLE';
+        var firing = state === 'RUNNING' || state === 'PAUSED';
+        $('heat').classList.toggle('on', firing && x.heat > 0);
+        $('profile').textContent = firing && x.profile ? x.profile : '';
+
+        var stageCls = $('stage').classList;
+        stageCls.toggle('alert', state === 'ERROR');
+
+        if (firing) {
+            var left = (x.totaltime || 0) - (x.runtime || 0);
+            $('state').textContent = state === 'PAUSED' ? 'Paused' : (x.catching_up ? 'Catching up' : 'Firing');
+            $('remaining').textContent = hhmm(left);
+            $('remaining-label').textContent = 'remaining';
+            $('target').textContent = typeof x.target === 'number' ? Math.round(x.target) + '°' + unit : '--';
+            $('rate').textContent = typeof x.heat_rate === 'number' ? Math.round(x.heat_rate) + '°' + unit + '/h' : '--';
+            $('finish').textContent = left > 0 ? clockTime(new Date(Date.now() + left * 1000)) : '--';
+            show('d-target', true); show('d-rate', true); show('d-finish', left > 0);
+        } else {
+            var hot = typeof temp === 'number' && (unit === 'F' ? temp > 120 : temp > 50);
+            $('state').textContent = state === 'TUNING' ? 'Tuning' : (state === 'ERROR' ? 'Error' : 'Idle');
+            $('remaining').textContent = hot ? 'Cooling' : (state === 'TUNING' ? 'Tuning' : 'Ready');
+            $('remaining-label').textContent = hot ? 'do not open' : ' ';
+            show('d-target', false); show('d-finish', false);
+            show('d-rate', hot && typeof x.heat_rate === 'number');
+            if (typeof x.heat_rate === 'number') {
+                $('rate').textContent = Math.round(x.heat_rate) + '°' + unit + '/h';
+            }
+        }
+        $('cone').textContent = x.cone || '--';
+        show('d-cone', !!x.cone);
+    }
+
+    window.glanceRender = render;   // for previews and tests
+
+    connect('config', function (cfg) {
+        if (cfg.temp_scale) { unit = cfg.temp_scale === 'f' ? 'F' : 'C'; }
+    }, function (ws) { ws.send('GET'); });
+
+    connect('status', function (x) {
+        lastMessage = Date.now();
+        document.body.classList.remove('stale');
+        if (x.type === 'backlog') { return; }
+        if (x.state !== undefined || x.temperature !== undefined) { render(x); }
+    });
+
+    // the controller sends a status every couple of seconds. dim the page
+    // when it goes quiet, so a frozen display is never mistaken for live.
+    setInterval(function () {
+        $('clock').textContent = clockTime(new Date());
+        if (lastMessage && Date.now() - lastMessage > 20000) {
+            document.body.classList.add('stale');
+        }
+    }, 1000);
+
+    // nudge everything a few pixels every minute against screen burn-in
+    setInterval(function () {
+        var dx = Math.round((Math.random() - 0.5) * 3) + 'vw';
+        var dy = Math.round((Math.random() - 0.5) * 3) + 'vh';
+        $('stage').style.transform = 'translate(' + dx + ',' + dy + ')';
+    }, 60000);
+
+    // tap or click for the full controller
+    document.addEventListener('click', function () { location.href = '/'; });
+})();
+</script>
+</body>
+</html>

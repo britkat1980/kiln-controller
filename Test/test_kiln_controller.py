@@ -96,6 +96,18 @@ def test_index_serves_spa(monkeypatch):
     assert html.headers['Content-Type'].startswith('text/html')
 
 
+def test_glance_serves_screensaver_page():
+    html = controller.glance()
+    assert html.headers['Content-Type'].startswith('text/html')
+
+
+def test_glance_page_reads_the_status_socket():
+    with open(os.path.join(controller.public_root, 'glance.html'), encoding='utf-8') as f:
+        page = f.read()
+    assert "connect('status'" in page
+    assert 'totaltime' in page and 'runtime' in page
+
+
 def test_state_redirects_to_details():
     with pytest.raises(bottle.HTTPResponse) as excinfo:
         controller.state()
