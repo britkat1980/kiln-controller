@@ -25,9 +25,13 @@ if [ "${1:-}" = "--remove" ]; then
     exit 0
 fi
 
-# default to the port in config.py
+# default to the port in config_local.py (your settings), else config.py
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="$(sed -n 's/^listening_port *= *\([0-9]*\).*/\1/p' "$REPO_DIR/config.py" 2>/dev/null || true)"
+PORT=""
+for f in "$REPO_DIR/config_local.py" "$REPO_DIR/config.py"; do
+    [ -n "$PORT" ] && break
+    PORT="$(sed -n 's/^listening_port *= *\([0-9]*\).*/\1/p' "$f" 2>/dev/null | tail -1 || true)"
+done
 URL="${1:-http://localhost:${PORT:-8081}/glance?kiosk=1}"
 
 if ! command -v chromium >/dev/null; then
