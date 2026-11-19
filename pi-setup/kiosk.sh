@@ -5,6 +5,10 @@
 # and desktop autologin (raspi-config > system > boot / auto login).
 # run as the desktop user, not root:
 #     bash pi-setup/kiosk.sh [url]
+# the default url is the glance view (temperature and time remaining in
+# large type); a tap opens the full controller, which returns to the
+# glance view after five minutes without a touch. pass
+# http://localhost:8081/ to start on the full controller instead.
 # undo with: bash pi-setup/kiosk.sh --remove
 #
 # the panel and desktop icons are not started, so the browser is all
@@ -24,7 +28,7 @@ fi
 # default to the port in config.py
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="$(sed -n 's/^listening_port *= *\([0-9]*\).*/\1/p' "$REPO_DIR/config.py" 2>/dev/null || true)"
-URL="${1:-http://localhost:${PORT:-8081}/}"
+URL="${1:-http://localhost:${PORT:-8081}/glance?kiosk=1}"
 
 if ! command -v chromium >/dev/null; then
     sudo apt-get install -y chromium

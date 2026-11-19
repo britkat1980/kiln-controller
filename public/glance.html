@@ -213,8 +213,11 @@ body.stale #offline { display: block; }
         $('stage').style.transform = 'translate(' + dx + ',' + dy + ')';
     }, 60000);
 
-    // tap or click for the full controller
-    document.addEventListener('click', function () { location.href = '/'; });
+    // tap or click for the full controller. on the kiosk (?kiosk=1) it
+    // comes back here after a few minutes without a touch
+    document.addEventListener('click', function () {
+        location.href = /[?&]kiosk=1(&|$)/.test(location.search) ? '/?kiosk=1' : '/';
+    });
 })();
 </script>
 </body>

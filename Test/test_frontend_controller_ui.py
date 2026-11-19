@@ -1513,3 +1513,62 @@ def test_gap_restarts_the_window(rate_js):
     resume = 1000 + 400 * 5 + 3600
     after = [p['x'] for p in pts if p['x'] >= resume]
     assert after and after[0] >= resume + 300
+
+
+########################################################################
+# kiosk: back to the glance view when the touchscreen is left alone
+########################################################################
+
+def kiosk_js(search):
+    src = open(JS_PATH).read()
+    ctx = quickjs.Context()
+    ctx.eval(extract_function(src, 'startKioskReturn'))
+    ctx.eval("""
+        var kiosk_return_ms = 300000;
+        var state = 'IDLE';
+        var timers = [];
+        var listeners = {};
+        var link = { href: '/glance' };
+        function setTimeout(fn, ms) { timers.push({ fn: fn, ms: ms }); return timers.length; }
+        function clearTimeout(id) { if (id) { timers[id - 1].cleared = true; } }
+        var document = {
+            getElementById: function(id) { return id === 'glance_link' ? link : null; },
+            addEventListener: function(ev, fn) { listeners[ev] = fn; }
+        };
+        var window = { location: { search: %s, href: '/' } };
+        function live() { return timers.filter(function(t) { return !t.cleared; }); }
+    """ % json.dumps(search))
+    return ctx
+
+
+def test_kiosk_returns_to_glance_after_five_idle_minutes():
+    js = kiosk_js('?kiosk=1')
+    assert js.eval('startKioskReturn()') is True
+    assert js.eval('link.href') == '/glance?kiosk=1'
+    assert js.eval('live().length') == 1
+    assert js.eval('live()[0].ms') == 300000
+    js.eval('live()[0].fn()')
+    assert js.eval('window.location.href') == '/glance?kiosk=1'
+
+
+def test_kiosk_touch_restarts_the_timer():
+    js = kiosk_js('?kiosk=1')
+    js.eval('startKioskReturn()')
+    js.eval('listeners.pointerdown()')
+    assert js.eval('live().length') == 1
+    assert js.eval('timers.length') == 2
+
+
+def test_kiosk_waits_while_a_schedule_is_edited():
+    js = kiosk_js('?kiosk=1')
+    js.eval('startKioskReturn()')
+    js.eval("state = 'EDIT'; live()[0].fn()")
+    assert js.eval('window.location.href') == '/'
+    assert js.eval('live().length') == 1
+
+
+def test_no_kiosk_return_in_a_normal_browser():
+    js = kiosk_js('')
+    assert js.eval('startKioskReturn()') is False
+    assert js.eval('timers.length') == 0
+    assert js.eval('link.href') == '/glance'

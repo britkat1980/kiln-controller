@@ -46,7 +46,12 @@ desktop*, with desktop autologin on, and run as the desktop user:
 bash ~/kiln-controller/pi-setup/kiosk.sh
 ```
 
-then reboot. Chromium opens the controller page once the service answers,
-and is restarted if it exits. Its output goes to `~/.cache/kiln-kiosk.log`.
+then reboot. Chromium opens the glance view (temperature and time
+remaining in large type) once the service answers. Tap it for the full
+controller, which goes back to the glance view after five minutes without
+a touch. To start on the full controller instead, run
+`bash ~/kiln-controller/pi-setup/kiosk.sh http://localhost:8081/`.
+Chromium is restarted if it
+exits. Its output goes to `~/.cache/kiln-kiosk.log`.
 On a Pi 3 it takes a minute or two to appear after boot. Undo with
 `bash ~/kiln-controller/pi-setup/kiosk.sh --remove`.

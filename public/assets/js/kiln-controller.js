@@ -2966,5 +2966,32 @@ function init()
     };
 }
 
+// on the kiosk the touchscreen starts on the glance view (/glance?kiosk=1),
+// and a tap opens this page as /?kiosk=1. go back to the glance view after
+// five minutes without a touch, unless a schedule is being edited.
+var kiosk_return_ms = 5 * 60 * 1000;
+
+function startKioskReturn() {
+    try {
+        if (!/[?&]kiosk=1(&|$)/.test(window.location.search)) { return false; }
+    } catch (e) { return false; }
+    var link = document.getElementById('glance_link');
+    if (link) { link.href = '/glance?kiosk=1'; }
+    var timer = null;
+    var reset = function() {
+        clearTimeout(timer);
+        timer = setTimeout(function() {
+            if (state === 'EDIT') { reset(); return; }
+            window.location.href = '/glance?kiosk=1';
+        }, kiosk_return_ms);
+    };
+    ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(function(ev) {
+        document.addEventListener(ev, reset, {passive: true});
+    });
+    reset();
+    return true;
+}
+
 init();
 openTabFromHash();
+startKioskReturn();
