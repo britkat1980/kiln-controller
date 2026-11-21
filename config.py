@@ -218,6 +218,11 @@ sensor_time_wait = 2
 pid_kp = 4.112
 pid_ki = 32.972
 pid_kd = 139.384
+# seconds of readings the derivative (pid_kd) term takes its trend from.
+# a least-squares slope over this window ignores the sample-to-sample
+# jumps that element leakage causes at high temperature, which otherwise
+# cut the power. 0 uses the change since the last reading instead.
+pid_derivative_window = 120
 
 
 ########################################################################

@@ -994,9 +994,9 @@ def test_fire_scheduled_run_idle(monkeypatch):
     monkeypatch.setattr(controller.ovenWatcher, 'record', lambda profile: None)
     entry = {'id': 'abc', 'profile': 'cone-05-long-bisque', 'startat': 0}
     assert controller.fire_scheduled_run(entry) is True
-    # scheduled runs never seek, even when the kiln is hot from a
-    # previous run. they always start from the beginning.
-    assert calls == [('cone-05-long-bisque', 0, False)]
+    # a scheduled run skips ahead when the kiln is already warm, as
+    # pressing start does (a chained run does not, see below)
+    assert calls == [('cone-05-long-bisque', 0, True)]
 
 
 def test_fire_scheduled_run_busy_oven(monkeypatch):

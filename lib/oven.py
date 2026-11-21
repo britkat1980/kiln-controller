@@ -1644,6 +1644,21 @@ class PID():
         self.iterm = 0
         self.lastErr = 0
         self.pidstats = {}
+        # (epoch, error) over the last pid_derivative_window seconds
+        self.err_history = []
+
+    def error_slope(self):
+        '''least-squares slope of the error over the recent history, in
+        degrees per second. 0 until there are two points.'''
+        n = len(self.err_history)
+        if n < 2:
+            return 0
+        mt = sum(t for t, _ in self.err_history) / n
+        me = sum(e for _, e in self.err_history) / n
+        stt = sum((t - mt) ** 2 for t, _ in self.err_history)
+        if stt <= 0:
+            return 0
+        return sum((t - mt) * (e - me) for t, e in self.err_history) / stt
 
     # FIX - this was using a really small window where the PID control
     # takes effect from -1 to 1. I changed this to various numbers and
@@ -1665,6 +1680,22 @@ class PID():
         window_size = 100
 
         error = float(setpoint - ispoint)
+
+        # the derivative is the trend of the error over the last
+        # pid_derivative_window seconds, not the change since the last
+        # sample. near the top of a firing element leakage makes readings
+        # jump several degrees between samples, and a sample-to-sample kd
+        # term turned each jump into a power cut: 73% element duty at
+        # 1200C+ on a cone 6 firing the kiln could only just manage. a
+        # kiln cannot really change temperature faster than this window
+        # resolves. 0 keeps the old sample-to-sample derivative.
+        deriv_window = getattr(config, 'pid_derivative_window', 120)
+        self.err_history.append((now_epoch, error))
+        if deriv_window:
+            self.err_history = [(t, e) for t, e in self.err_history
+                                if now_epoch - t <= deriv_window]
+        else:
+            self.err_history = self.err_history[-2:]
 
         # this removes the need for config.stop_integral_windup
         # it turns the controller into a binary on/off switch
@@ -1695,7 +1726,9 @@ class PID():
             # then held the elements on past the target on the hold that
             # followed until it unwound
             self.iterm = sorted([-1 * window_size, self.iterm, window_size])[1]
-            if timeDelta > 0:
+            if deriv_window:
+                dErr = self.error_slope()
+            elif timeDelta > 0:
                 dErr = (error - self.lastErr) / timeDelta
             else:
                 dErr = 0

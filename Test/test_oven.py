@@ -219,6 +219,20 @@ def test_pid_inside_window():
     assert pid.pidstats['ispoint'] == 98
     assert pid.pidstats['err'] == 2
     assert pid.pidstats['timeDelta'] == 2
+    # one reading has no trend yet, so no derivative kick
+    assert pid.pidstats['d'] == 0
+    assert 0 < pid.pidstats['out'] < 1
+
+
+def test_pid_inside_window_sample_to_sample_derivative(monkeypatch):
+    '''pid_derivative_window = 0 keeps the old derivative: the change
+    since the last reading'''
+    monkeypatch.setattr(config, 'pid_derivative_window', 0, raising=False)
+    pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
+    now1 = datetime.datetime(2020, 1, 1)
+    pid.lastNow = now1
+    pid.compute(100, 98, now1 + datetime.timedelta(seconds=2))
+    assert pid.pidstats['errDelta'] == pytest.approx(1.0)   # (2 - 0) / 2 s
     assert pid.pidstats['out'] == 1.0  # clamped to the window
 
 
@@ -258,6 +272,57 @@ def test_pid_integral_clamped_below():
         now += datetime.timedelta(seconds=5)
         pid.compute(1000, 1002, now)
     assert pid.iterm == -100
+
+
+def _noisy_climb(pid, behind, steps=720, noise=(0, 6, -5, 3, -2, 7, -6, 1)):
+    '''a kiln climbing 111C/h, a few degrees behind its target, with
+    the sample-to-sample jumps element leakage causes near 1200C'''
+    now = datetime.datetime(2020, 1, 1)
+    pid.lastNow = now
+    outs = []
+    for k in range(steps):
+        now += datetime.timedelta(seconds=5)
+        target = 1100 + k * 5 * 111 / 3600
+        outs.append(pid.compute(target, target - behind + noise[k % len(noise)] / 2, now))
+    return outs
+
+
+def test_pid_noisy_readings_do_not_cut_power_when_behind(monkeypatch):
+    monkeypatch.setattr(config, 'temp_scale', 'c')
+    monkeypatch.setattr(config, 'pid_control_window', 5)
+    monkeypatch.setattr(config, 'pid_derivative_window', 120, raising=False)
+    pid = PID(ki=18.8201, kp=7.5855, kd=270.7288)
+    # after the first 200 steps, by when the integral has built up
+    outs = _noisy_climb(pid, behind=3)[200:]
+    assert min(outs) > 0.6
+    assert sum(outs) / len(outs) > 0.97
+
+
+def test_pid_sample_to_sample_derivative_cut_power_on_noise(monkeypatch):
+    '''the problem the derivative window fixes'''
+    monkeypatch.setattr(config, 'temp_scale', 'c')
+    monkeypatch.setattr(config, 'pid_control_window', 5)
+    monkeypatch.setattr(config, 'pid_derivative_window', 0, raising=False)
+    pid = PID(ki=18.8201, kp=7.5855, kd=270.7288)
+    outs = _noisy_climb(pid, behind=3)[200:]
+    assert min(outs) < 0.1
+    assert sum(outs) / len(outs) < 0.7
+
+
+def test_pid_derivative_follows_a_real_trend(monkeypatch):
+    '''a genuine fall in the error (the kiln closing on its target)
+    still reaches the derivative term'''
+    monkeypatch.setattr(config, 'temp_scale', 'c')
+    monkeypatch.setattr(config, 'pid_control_window', 10)
+    monkeypatch.setattr(config, 'pid_derivative_window', 120, raising=False)
+    pid = PID(ki=18.8201, kp=7.5855, kd=270.7288)
+    now = datetime.datetime(2020, 1, 1)
+    pid.lastNow = now
+    for k in range(30):                    # error falls 0.05C/s: 8 -> 0.75
+        now += datetime.timedelta(seconds=5)
+        pid.compute(1000, 992 + k * 0.25, now)
+    assert pid.pidstats['errDelta'] == pytest.approx(-0.05)
+    assert pid.pidstats['d'] == pytest.approx(-0.05 * 270.7288)
 
 
 def test_pid_time_delta_unaffected_by_dst():
